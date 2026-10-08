@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, BigInteger, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -28,6 +28,14 @@ class ManualRevision(Base):
     status: Mapped[str] = mapped_column(String(20), default='DRAFT')
     uploaded_by: Mapped[str] = mapped_column(String(100))
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    content_version: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    ba_updated_by: Mapped[str | None] = mapped_column(String(100))
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    dev_review_requested: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
+    dev_reviewed_by: Mapped[str | None] = mapped_column(String(100))
+    dev_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    dev_changes_requested: Mapped[bool | None] = mapped_column(Boolean)
+    dev_review_comment: Mapped[str | None] = mapped_column(Text)
     submitted_by: Mapped[str | None] = mapped_column(String(100))
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     published_by: Mapped[str | None] = mapped_column(String(100))

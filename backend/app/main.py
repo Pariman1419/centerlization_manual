@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import get_db
-from app.routers import manuals, revisions, projects, auth, users, admin
+from app.routers import manuals, revisions, revision_updates, projects, auth, users, admin
 from app.services.minio_service import get_storage
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,7 @@ app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_origins,
     allow_methods=['GET', 'POST', 'PUT'], allow_headers=['Content-Type', 'Authorization', 'X-CSRF-Token'], allow_credentials=True)
 app.include_router(manuals.router)
 app.include_router(revisions.router)
+app.include_router(revision_updates.router)
 app.include_router(projects.router)
 app.include_router(auth.router)
 app.include_router(users.router)

@@ -12,7 +12,6 @@ from app.models.manual_revision import ManualRevision
 from app.models.project_member import ProjectMember
 from app.models.revision_review import RevisionReview
 from app.models.user import User, UserSession
-from app.services.audit import ACTIONS
 from test_project_members import auth_users, make_pdf  # noqa: F401  (fixture re-export)
 
 PW = 'Password123!'
@@ -57,6 +56,9 @@ def test_full_workflow_roles_isolation_and_audit(auth_users):
     r2 = upload(ba02, manual['id'], '02').json()['id']
     assert ba02.post(f'/api/revisions/{r2}/submit-review').status_code == 200
     assert eng.post(f'/api/revisions/{r2}/reject', json={'comment': 'fix it'}).json()['status'] == 'REJECTED'
+    assert ba02.post(f'/api/revisions/{r2}/submit-review').status_code == 400
+    rejected_revision = r2
+    r2 = upload(ba02, manual['id'], '03').json()['id']
     assert ba02.post(f'/api/revisions/{r2}/submit-review').json()['status'] == 'IN_REVIEW'
     assert eng.post(f'/api/revisions/{r2}/approve', json={}).status_code == 200
     assert ba01.post(f'/api/revisions/{r2}/publish').status_code == 200
@@ -64,10 +66,12 @@ def test_full_workflow_roles_isolation_and_audit(auth_users):
     db.expire_all()
     assert db.get(ManualRevision, r1).status == 'ARCHIVED' and db.get(ManualRevision, r2).status == 'PUBLISHED'
     assert db.get(Manual, manual['id']).current_revision_id == r2
-    assert len(storage.objects) == 2
-    decisions = [r.decision for r in db.scalars(select(RevisionReview).where(RevisionReview.revision_id == r2).order_by(RevisionReview.id))]
+    assert len(storage.objects) == 3
+    decisions = [r.decision for r in db.scalars(select(RevisionReview).where(
+        RevisionReview.revision_id.in_([rejected_revision, r2])).order_by(RevisionReview.id))]
     assert decisions == ['REJECTED', 'APPROVED']
-    assert len(ba02.get(f'/api/revisions/{r2}/reviews').json()) == 2
+    assert ba02.get(f'/api/revisions/{rejected_revision}/reviews').json()[0]['comment'] == 'fix it'
+    assert len(ba02.get(f'/api/revisions/{r2}/reviews').json()) == 1
 
     # BA03 (non-member): everything denied and no presigned URL is ever generated.
     signed = []
@@ -207,5 +211,9 @@ def test_audit_failure_rolls_back_business_change(auth_users, monkeypatch):
     assert not db.scalars(select(AuditLog).where(AuditLog.action == 'REVISION_APPROVED')).all()
 
 
-def test_all_reserved_actions_are_defined():
-    assert len(ACTIONS) == 21
+def test_unknown_audit_action_is_rejected_without_writing(context):
+    from app.services.audit import write_audit_event
+    _, db, _ = context
+    with pytest.raises(ValueError, match='Unknown audit action'):
+        write_audit_event(db, 'NOT_A_WORKFLOW_ACTION')
+    assert db.scalars(select(AuditLog)).all() == []

@@ -1,4 +1,4 @@
-import type { Manual, ManualInput, Revision, RevisionReview } from '../types/manual'
+import type { Manual, ManualInput, Revision, RevisionReview, RevisionUpdateEvent } from '../types/manual'
 
 let csrfToken = ''
 let requestGeneration = 0
@@ -57,8 +57,8 @@ export const manualsApi = {
   upload: (id: number, body: FormData) => request<Revision>(`/manuals/${id}/revisions`, { method: 'POST', body }),
   publish: (id: number) => request<Revision>(`/revisions/${id}/publish`, { method: 'POST' }),
   submitReview: (id: number) => request<Revision>(`/revisions/${id}/submit-review`, { method: 'POST' }),
-  approve: (id: number, comment?: string) => request<Revision>(`/revisions/${id}/approve`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment }),
+  approve: (id: number, comment?: string, expected_version = 0) => request<Revision>(`/revisions/${id}/approve`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment, expected_version }),
   }),
   reject: (id: number, comment: string) => request<Revision>(`/revisions/${id}/reject`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment }),
@@ -69,6 +69,14 @@ export const manualsApi = {
   updateRevision: (id: number, revision_detail: string) => request<Revision>(`/revisions/${id}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision_detail }),
   }),
+  replaceFiles: (id: number, body: FormData) => request<Revision>(`/revisions/${id}/update-files`, { method: 'POST', body }),
+  requestDevReview: (id: number, expected_version: number) => request<Revision>(`/revisions/${id}/request-dev-review`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expected_version }),
+  }),
+  devReview: (id: number, expected_version: number, changes_requested: boolean, comment: string) => request<Revision>(`/revisions/${id}/dev-review`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expected_version, changes_requested, comment }),
+  }),
+  updates: (id: number) => request<RevisionUpdateEvent[]>(`/revisions/${id}/updates`),
   withdraw: (id: number) => request<Revision>(`/revisions/${id}/withdraw`, { method: 'POST' }),
   deleteRevision: (id: number) => request<{ deleted: boolean }>(`/revisions/${id}`, { method: 'DELETE' }),
   deleteManual: (id: number) => request<{ deleted: boolean }>(`/manuals/${id}`, { method: 'DELETE' }),

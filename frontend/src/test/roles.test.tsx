@@ -38,7 +38,7 @@ async function manualActions(role: string | null) {
   await new Promise(resolve => setTimeout(resolve, 50))   // let the project role request settle
   const has = (name: RegExp | string) => screen.queryByRole('button', { name }) !== null
   return {
-    upload: has(/Upload New Revision/), submit: has(/^Submit REV 01 for review$/) && has(/^Submit REV 04 for review$/),
+    upload: has(/Upload New Revision/), submit: has(/^Submit REV 01 for review$/),
     approve: has('Approve REV 02'), reject: has('Reject REV 02'), publish: has('Publish REV 03'),
   }
 }

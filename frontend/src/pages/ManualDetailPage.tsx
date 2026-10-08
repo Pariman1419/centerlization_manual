@@ -7,6 +7,7 @@ import { Dialog } from '../components/Dialog'
 import { ManualForm } from '../components/ManualForm'
 import { RevisionFiles } from '../components/RevisionFiles'
 import { RevisionHistory } from '../components/RevisionHistory'
+import { DevReviewDialog } from '../components/DevReviewDialog'
 import { formatDate, StatusBadge } from '../components/StatusBadge'
 import { UploadRevisionModal } from '../components/UploadRevisionModal'
 import { RevisionStepper } from '../components/RevisionStepper'
@@ -26,6 +27,8 @@ export function ManualDetailPage({ currentUsername }: { currentUsername?: string
   const [error, setError] = useState('')
   const [message, setMessage] = useState<string>(location.state?.message || '')
   const [uploading, setUploading] = useState(false)
+  const [updatingRevision, setUpdatingRevision] = useState<Revision | null>(null)
+  const [devReviewDialog, setDevReviewDialog] = useState<{ revision: Revision; mode: 'request' | 'feedback' } | null>(null)
   const [reload, setReload] = useState(0)
   const [role, setRole] = useState<EffectiveRole>(null)
 
@@ -213,7 +216,7 @@ export function ManualDetailPage({ currentUsername }: { currentUsername?: string
     setApproving(true)
     setApproveError('')
     try {
-      const revision = await manualsApi.approve(selectedApprove.id, approveComment.trim() || undefined)
+      const revision = await manualsApi.approve(selectedApprove.id, approveComment.trim() || undefined, selectedApprove.content_version ?? 0)
       setSelectedApprove(null)
       setApproveComment('')
       setMessage(`REV ${revision.revision_no} approved.`)
@@ -358,6 +361,10 @@ export function ManualDetailPage({ currentUsername }: { currentUsername?: string
           <RevisionHistory
             revisions={revisions}
             reviewsMap={reviewsMap}
+            onUpdate={!atLeast(role, 'REVIEWER') ? undefined : rev => { setUpdatingRevision(rev); setMessage('') }}
+            onRequestDevReview={!atLeast(role, 'REVIEWER') ? undefined : rev => setDevReviewDialog({ revision: rev, mode: 'request' })}
+            onDevReview={role !== 'CONTRIBUTOR' && role !== 'DEV' ? undefined : rev => setDevReviewDialog({ revision: rev, mode: 'feedback' })}
+            onReupload={!atLeast(role, 'CONTRIBUTOR') ? undefined : () => { setUploading(true); setMessage('') }}
             onSubmitReview={!atLeast(role, 'CONTRIBUTOR') ? undefined : rev => {
               setSelectedSubmit(rev)
               setSubmitError('')
@@ -411,6 +418,21 @@ export function ManualDetailPage({ currentUsername }: { currentUsername?: string
               }}
             />
           )}
+
+          {updatingRevision && <UploadRevisionModal manual={manual} revision={updatingRevision}
+            onClose={() => setUpdatingRevision(null)}
+            onUploaded={revision => {
+              setUpdatingRevision(null)
+              setMessage(`REV ${revision.revision_no} updated. Approve the draft or request Dev review.`)
+              setReload(v => v + 1)
+            }} />}
+          {devReviewDialog && <DevReviewDialog revision={devReviewDialog.revision} mode={devReviewDialog.mode}
+            onClose={() => setDevReviewDialog(null)}
+            onCompleted={() => {
+              setMessage(devReviewDialog.mode === 'request' ? 'Dev review requested.' : 'Dev feedback saved.')
+              setDevReviewDialog(null)
+              setReload(v => v + 1)
+            }} />}
 
           {/* Submit for Review Dialog */}
           {selectedSubmit && (
@@ -481,7 +503,7 @@ export function ManualDetailPage({ currentUsername }: { currentUsername?: string
               busy={rejecting}
             >
               <div className="space-y-3 px-6 py-5 text-sm leading-6 text-slate-600">
-                <p>Reject this revision and return feedback to the submitter.</p>
+                <p>Reject this revision with a reason. Dev must correct the document, upload a new revision and submit it for review.</p>
                 <div>
                   <label htmlFor="reject-comment" className="block text-xs font-medium text-slate-700">
                     Reason for Rejection <span className="text-red-700">*</span>

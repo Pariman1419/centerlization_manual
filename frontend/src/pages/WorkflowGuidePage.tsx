@@ -567,6 +567,83 @@ export function WorkflowGuidePage() {
             </p>
           </div>
 
+          <figure className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6" aria-labelledby="workflow-diagram-title">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h3 id="workflow-diagram-title" className="text-lg font-semibold text-slate-900">
+                {lang === 'en' ? 'Manual Review & Publishing Workflow' : 'แผนภาพการตรวจ แก้ไข และเผยแพร่คู่มือ'}
+              </h3>
+              <a href="/images/manual-review-workflow.png" target="_blank" rel="noopener noreferrer" className="btn-secondary text-sm">
+                {lang === 'en' ? 'Open Full-size Diagram' : 'เปิดภาพขนาดเต็ม'}
+              </a>
+            </div>
+            <a href="/images/manual-review-workflow.png" target="_blank" rel="noopener noreferrer"
+              aria-label={lang === 'en' ? 'Open the workflow diagram at full size in a new tab' : 'เปิดแผนภาพ workflow ขนาดเต็มในแท็บใหม่'}
+              className="block rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-800">
+              <img src="/images/manual-review-workflow.png" width={800} height={762} loading="lazy" decoding="async"
+                className="mx-auto h-auto w-full max-w-[800px]"
+                alt={lang === 'en'
+                  ? 'Workflow diagram: Dev submits a draft to BA. BA approves, rejects with a reason for Dev to re-upload, or updates the same REV. Optional Dev feedback returns changes to BA, or lets BA approve and publish. Viewers read published manuals.'
+                  : 'แผนภาพ workflow: Dev ส่งร่างให้ BA ตรวจ BA เลือก Approve, Reject พร้อมเหตุผลให้ Dev อัปโหลดใหม่ หรือ Update ใน REV เดิม หากส่งให้ Dev ตรวจร่วมและต้องแก้จะกลับไปหา BA หากผ่านแล้ว BA อนุมัติและเผยแพร่ให้ Viewer อ่าน'} />
+            </a>
+            <figcaption className="mt-4 text-sm leading-6 text-slate-600">
+              {lang === 'en'
+                ? 'Read from the top: log in, select an accessible Project, then follow your role. The diagram uses Thai labels; the explanations below describe each path in your selected language.'
+                : 'อ่านจากบนลงล่าง: เข้าสู่ระบบ เลือก Project ที่มีสิทธิ์ แล้วทำตามเส้นทางของบทบาทตนเอง กดภาพหรือปุ่มเปิดภาพขนาดเต็มเพื่ออ่านข้อความในแต่ละขั้นตอน'}
+            </figcaption>
+          </figure>
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-slate-900">
+              {lang === 'en' ? 'How to Follow the Review Paths' : 'คำอธิบายเส้นทางการตรวจเอกสาร'}
+            </h3>
+            <p className="text-sm leading-6 text-slate-600">
+              {lang === 'en'
+                ? 'Dev uploads the initial REV as DRAFT and selects Submit for Review. BA checks both the content and the attached files, then chooses one of the following actions.'
+                : 'Dev อัปโหลด REV ครั้งแรกเป็น DRAFT แล้วกด Submit for Review เพื่อส่งให้ BA ตรวจทั้งเนื้อหาและไฟล์แนบ จากนั้น BA เลือกดำเนินการดังนี้'}
+            </p>
+            <dl className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <dt className="font-semibold text-emerald-900">Approve</dt>
+                <dd className="mt-2 text-sm leading-6 text-slate-700">
+                  {lang === 'en'
+                    ? 'When the document is correct, BA approves it (APPROVED). BA / Admin then selects Publish to make it the current published revision.'
+                    : 'เมื่อเอกสารถูกต้อง BA กด Approve เป็นสถานะ APPROVED จากนั้น BA / Admin กด Publish เพื่อให้เป็นฉบับเผยแพร่ปัจจุบัน'}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                <dt className="font-semibold text-red-900">Reject</dt>
+                <dd className="mt-2 text-sm leading-6 text-slate-700">
+                  {lang === 'en'
+                    ? 'BA must enter a rejection reason. Dev reads the feedback, corrects the document and uploads a new revision, then submits the new draft for review. The rejected file cannot be resubmitted unchanged.'
+                    : 'BA ต้องระบุเหตุผลที่ไม่ผ่าน Dev อ่านข้อเสนอแนะ แก้ไขเอกสาร และอัปโหลด Revision ใหม่เป็น DRAFT แล้วส่งตรวจอีกครั้ง ไฟล์ที่ถูก Reject จะส่งตรวจซ้ำโดยไม่อัปโหลดใหม่ไม่ได้'}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <dt className="font-semibold text-blue-900">Update / Edit</dt>
+                <dd className="mt-2 text-sm leading-6 text-slate-700">
+                  {lang === 'en'
+                    ? 'BA corrects the document and uploads replacement files in the same REV. It returns to DRAFT and records the update history. BA can approve directly or request Dev review first.'
+                    : 'BA แก้ไขเอกสารเองและอัปโหลดไฟล์แทนใน REV เดิม เอกสารกลับเป็น DRAFT พร้อมบันทึกประวัติ BA เลือก Approve ได้โดยตรง หรือส่งให้ Dev ตรวจร่วมก่อน'}
+                </dd>
+              </div>
+            </dl>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+              <p className="font-semibold text-slate-900">
+                {lang === 'en' ? 'Optional Dev Review After a BA Update' : 'การให้ Dev ตรวจร่วมหลัง BA แก้ไข'}
+              </p>
+              <p className="mt-2">
+                {lang === 'en'
+                  ? 'If Dev review is not needed, BA approves the updated draft directly. If requested, Dev checks the latest files: Request Changes requires feedback and returns the document to BA for another update; No Further Changes means the document has passed and BA can approve directly. While Dev review is pending or changes remain unresolved, approval is unavailable.'
+                  : 'หากไม่ต้องให้ Dev ตรวจ BA กด Approve จากร่างที่แก้แล้วได้เลย หากต้องตรวจ Dev จะอ่านไฟล์ล่าสุดและเลือก Request Changes พร้อมข้อเสนอแนะเพื่อให้ BA แก้เพิ่ม หรือ No Further Changes เมื่อเอกสารผ่านแล้ว BA จึงกด Approve ได้โดยตรง ระหว่างรอ Dev ตรวจหรือยังมีจุดที่ต้องแก้ จะยังอนุมัติไม่ได้'}
+              </p>
+              <p className="mt-2">
+                {lang === 'en'
+                  ? 'User / Viewer selects a published manual in an accessible Project to preview its PDF or download its files.'
+                  : 'User / Viewer เลือกคู่มือฉบับเผยแพร่ใน Project ที่มีสิทธิ์ เพื่อ Preview PDF หรือ Download ไฟล์ไปใช้งาน'}
+              </p>
+            </div>
+          </div>
+
           {/* Role Summary Badges */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50">
             <div className="p-3 bg-white rounded-lg border border-slate-200">
@@ -660,8 +737,20 @@ export function WorkflowGuidePage() {
                   <li>
                     <strong>{lang === 'en' ? 'If Changes Needed:' : 'หากต้องแก้ไข:'}</strong>{' '}
                     {lang === 'en'
-                      ? 'Click "Reject" with explicit feedback comments for revision.'
-                      : 'กด "Reject" พร้อมระบุเหตุผลและจุดที่ต้องปรับปรุงเพื่อให้ Dev แก้ไข'}
+                      ? 'Click "Reject" with a required reason. Dev corrects the document, uploads a new revision, then submits it for review.'
+                      : 'กด "Reject" พร้อมระบุเหตุผล ส่งกลับให้ Dev แก้ไขและอัปโหลด Revision ใหม่ แล้ว Submit for Review อีกครั้ง'}
+                  </li>
+                  <li>
+                    <strong>{lang === 'en' ? 'Update / Edit:' : 'BA แก้ไขเอง (Update / Edit):'}</strong>{' '}
+                    {lang === 'en'
+                      ? 'BA replaces files and edits details in the same REV. The update returns to DRAFT and clears prior approval and Dev feedback. BA may approve directly or request Dev review.'
+                      : 'BA แก้รายละเอียดและอัปโหลดไฟล์แทนใน REV เดิม เอกสารกลับเป็น DRAFT และต้องอนุมัติไฟล์ล่าสุดใหม่ BA กด Approve ได้เลย หรือเลือกส่งให้ Dev ตรวจร่วมก่อน'}
+                  </li>
+                  <li>
+                    <strong>{lang === 'en' ? 'Dev review of BA updates:' : 'Dev ตรวจไฟล์ที่ BA แก้:'}</strong>{' '}
+                    {lang === 'en'
+                      ? 'Dev selects Request Changes with feedback, or No Further Changes. Changes return to BA Update/Edit; no further changes lets BA approve directly.'
+                      : 'Dev เลือก Request Changes พร้อมข้อเสนอแนะเพื่อให้ BA แก้เพิ่ม หรือ No Further Changes เมื่อเอกสารผ่านแล้ว BA จึงกด Approve ได้โดยตรง'}
                   </li>
                 </ul>
               </div>

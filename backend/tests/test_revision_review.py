@@ -203,7 +203,7 @@ def test_approved_can_publish_and_archives_old(context, pdf):
     assert db.get(Manual, manual['id']).current_revision_id == rev2['id']
 
 
-def test_resubmission_and_review_history_retained(context, pdf):
+def test_new_upload_after_rejection_retains_both_review_histories(context, pdf):
     client, db, _ = context
     manual = create_manual(client).json()
     rev = upload(client, manual['id'], pdf).json()
@@ -219,9 +219,12 @@ def test_resubmission_and_review_history_retained(context, pdf):
     app.dependency_overrides[get_current_user] = lambda: reviewer
     client.post(f'/api/revisions/{rev["id"]}/reject', json={'comment': 'Please fix diagram on page 2'})
 
-    # Resubmit as contributor
+    # Rejection requires a corrected upload rather than resubmitting the old file.
     uploader = db.query(User).filter_by(username='BA').first()
     app.dependency_overrides[get_current_user] = lambda: uploader
+    assert client.post(f'/api/revisions/{rev["id"]}/submit-review').status_code == 400
+    rejected_rev = rev
+    rev = upload(client, manual['id'], pdf, number='02').json()
     resub = client.post(f'/api/revisions/{rev["id"]}/submit-review')
     assert resub.status_code == 200
     assert resub.json()['status'] == 'IN_REVIEW'
@@ -234,7 +237,7 @@ def test_resubmission_and_review_history_retained(context, pdf):
     # Retrieve reviews list
     reviews_res = client.get(f'/api/revisions/{rev["id"]}/reviews')
     assert reviews_res.status_code == 200
-    reviews = reviews_res.json()
+    reviews = reviews_res.json() + client.get(f'/api/revisions/{rejected_rev["id"]}/reviews').json()
     assert len(reviews) == 2
 
     # Most recent first
@@ -326,8 +329,9 @@ def test_minio_objects_unchanged(context, pdf):
     client.post(f'/api/revisions/{rev["id"]}/reject', json={'comment': 'Check details'})
     assert storage.objects[key] == initial_bytes
 
-    # Resubmit & Approve
+    # Upload the corrected file, then submit and approve; the rejected file is unchanged.
     app.dependency_overrides[get_current_user] = lambda: db.query(User).filter_by(username='BA').first()
+    rev = upload(client, manual['id'], pdf, number='02').json()
     client.post(f'/api/revisions/{rev["id"]}/submit-review')
     app.dependency_overrides[get_current_user] = lambda: reviewer
     client.post(f'/api/revisions/{rev["id"]}/approve', json={'comment': 'OK'})
@@ -398,6 +402,8 @@ def test_project_member_role_permissions(context, pdf, review_role):
     assert rejected.status_code == 200
     assert rejected.json()['status'] == 'REJECTED'
     app.dependency_overrides[get_current_user] = lambda: contributor
+    assert client.post(f'/api/revisions/{rev["id"]}/submit-review').status_code == 400
+    rev = upload(client, manual.id, pdf, number='02').json()
     assert client.post(f'/api/revisions/{rev["id"]}/submit-review').status_code == 200
     app.dependency_overrides[get_current_user] = lambda: reviewer
     appr_ok = client.post(f'/api/revisions/{rev["id"]}/approve', json={'comment': 'Reviewer approved'})

@@ -14,6 +14,7 @@ from app.routers.manuals import require_manual, safe_filename
 from app.schemas.manual_revision import FileAccess, ReviewActionInput, RevisionRead, RevisionReviewRead, RevisionUpdate
 from app.services.audit import AuditAction, write_audit_event
 from app.services.minio_service import get_storage
+from app.services.revision_workflow import check_version, require_dev_review_complete
 
 router = APIRouter(prefix='/api/revisions', tags=['revisions'], dependencies=[Depends(get_current_user)])
 logger = logging.getLogger(__name__)
@@ -76,14 +77,15 @@ def list_reviews(revision_id: int, db: Session = Depends(get_db), user: User = D
 def submit_review(revision_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     require_revision(db, revision_id, user, min_role='CONTRIBUTOR')
     try:
-        locked = db.scalar(select(ManualRevision).where(ManualRevision.id == revision_id).with_for_update())
+        locked = db.scalar(select(ManualRevision).where(ManualRevision.id == revision_id).with_for_update().execution_options(populate_existing=True))
         if locked is None:
             raise HTTPException(404, 'Revision not found')
         if locked.status == 'IN_REVIEW':
             raise HTTPException(409, 'Revision is already in review')
-        if locked.status not in ('DRAFT', 'REJECTED'):
+        if locked.status != 'DRAFT':
             raise HTTPException(400, f'Revision cannot be submitted for review from status {locked.status}')
 
+        require_dev_review_complete(locked)
         locked.status = 'IN_REVIEW'
         locked.submitted_by = user.username
         locked.submitted_at = utcnow()
@@ -102,11 +104,17 @@ def approve(revision_id: int, payload: ReviewActionInput | None = None, db: Sess
     require_revision(db, revision_id, user, min_role='REVIEWER')
 
     try:
-        locked = db.scalar(select(ManualRevision).where(ManualRevision.id == revision_id).with_for_update())
+        locked = db.scalar(select(ManualRevision).where(ManualRevision.id == revision_id).with_for_update().execution_options(populate_existing=True))
         if locked is None:
             raise HTTPException(404, 'Revision not found')
-        if locked.status != 'IN_REVIEW':
+        direct = locked.status == 'DRAFT' and locked.ba_updated_by is not None
+        if locked.status != 'IN_REVIEW' and not direct:
             raise HTTPException(409, f'Revision is not in review (current status: {locked.status})')
+        if locked.ba_updated_by:
+            check_version(locked, payload.expected_version if payload else None)
+        elif payload and payload.expected_version is not None:
+            check_version(locked, payload.expected_version)
+        require_dev_review_complete(locked)
 
         review = RevisionReview(
             revision_id=locked.id,
@@ -135,7 +143,7 @@ def reject(revision_id: int, payload: ReviewActionInput, db: Session = Depends(g
         raise HTTPException(400, 'Comment is required when rejecting a revision')
 
     try:
-        locked = db.scalar(select(ManualRevision).where(ManualRevision.id == revision_id).with_for_update())
+        locked = db.scalar(select(ManualRevision).where(ManualRevision.id == revision_id).with_for_update().execution_options(populate_existing=True))
         if locked is None:
             raise HTTPException(404, 'Revision not found')
         if locked.status != 'IN_REVIEW':
@@ -176,11 +184,15 @@ def require_revision_manager(db, revision_id, user, action, owner_field='uploade
 @router.put('/{revision_id}', response_model=RevisionRead)
 def update_revision(revision_id: int, payload: RevisionUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Edit the detail text of a DRAFT/REJECTED revision (file and number are immutable)."""
-    _, manual = require_revision_manager(db, revision_id, user, 'edit')
+    revision, manual = require_revision_manager(db, revision_id, user, 'edit')
+    if revision.ba_updated_by:
+        raise HTTPException(409, 'Use BA Update/Edit to change this revision')
     try:
-        locked = db.scalar(select(ManualRevision).where(ManualRevision.id == revision_id).with_for_update())
+        locked = db.scalar(select(ManualRevision).where(ManualRevision.id == revision_id).with_for_update().execution_options(populate_existing=True))
         if locked is None:
             raise HTTPException(404, 'Revision not found')
+        if locked.ba_updated_by:
+            raise HTTPException(409, 'Use BA Update/Edit to change this revision')
         if locked.status not in DELETABLE_STATUSES:
             raise HTTPException(409, f'Only DRAFT or REJECTED revisions can be edited (current status: {locked.status})')
         if (locked.revision_detail or None) != (payload.revision_detail or None):
@@ -200,7 +212,7 @@ def withdraw_review(revision_id: int, db: Session = Depends(get_db), user: User 
     """Pull a revision back from review to DRAFT (submitter, uploader, OWNER or ADMIN)."""
     _, manual = require_revision_manager(db, revision_id, user, 'withdraw', owner_field='submitted_by')
     try:
-        locked = db.scalar(select(ManualRevision).where(ManualRevision.id == revision_id).with_for_update())
+        locked = db.scalar(select(ManualRevision).where(ManualRevision.id == revision_id).with_for_update().execution_options(populate_existing=True))
         if locked is None:
             raise HTTPException(404, 'Revision not found')
         if locked.status != 'IN_REVIEW':
@@ -223,11 +235,11 @@ def delete_revision(revision_id: int, db: Session = Depends(get_db), storage=Dep
     """Delete a revision in any status. Contributors only their own uploads; OWNER/ADMIN any."""
     _, manual = require_revision_manager(db, revision_id, user, 'delete')
     try:
-        locked = db.scalar(select(ManualRevision).where(ManualRevision.id == revision_id).with_for_update())
+        current = db.scalar(select(Manual).where(Manual.id == manual.id).with_for_update().execution_options(populate_existing=True))
+        locked = db.scalar(select(ManualRevision).where(ManualRevision.id == revision_id).with_for_update().execution_options(populate_existing=True))
         if locked is None:
             raise HTTPException(404, 'Revision not found')
         keys = sorted(locked.all_object_keys)
-        current = db.scalar(select(Manual).where(Manual.id == locked.manual_id).with_for_update())
         if current is not None and current.current_revision_id == locked.id:
             current.current_revision_id = None
             current.status = 'DRAFT'

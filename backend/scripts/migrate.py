@@ -10,7 +10,7 @@ from app.config import get_settings
 # (all are idempotent/additive, but never re-run blindly against a live database).
 MIGRATIONS = ['001_status_and_publish_guard.sql', '002_projects.sql', '003_users_and_ownership.sql',
     '004_project_members.sql', '005_revision_review.sql', '006_password_reset.sql', '007_audit_logs.sql',
-    '008_revision_files.sql', '009_revision_file_label.sql', '010_project_admin_role.sql']
+    '008_revision_files.sql', '009_revision_file_label.sql', '010_project_admin_role.sql', '011_ba_revision_updates.sql']
 
 
 def main():

@@ -161,3 +161,7 @@ npm.cmd audit
 Current verification: **50 backend tests and 20 frontend tests passed**, TypeScript/build PASS and zero npm audit vulnerabilities. Tests use isolated SQLite and memory storage; new auth tests exercise real password/session/CSRF behavior. Live smoke passed with PostgreSQL, real HTTP and MinIO for two separate users, administrator visibility, every descendant access check, upload/preview/download/publish/current-pointer behavior, and scoped fixture cleanup. Browser admin Login/Users/form/Logout passed. Full browser PDF selection retains the previously documented extension file-access limitation.
 
 The old Phase 1/2 fixtures were removed at the user's request. `docs/implementation-report.md`, `docs/project-management-report.md`, `scripts/smoke.py` and `scripts/smoke_projects.py` describe those historical checks. Use the current `scripts/smoke_auth.py` verification. See `docs/authentication-report.md` for the latest files, schema, test results and login instructions.
+
+## BA Update/Edit workflow
+
+BA can replace draft files in the same REV, request optional Dev feedback, and approve an updated draft directly when no Dev changes are pending. Reject requires a reason and a new corrected upload from Dev. Apply `011_ba_revision_updates.sql` before deploying this backend. See [BA Update/Edit workflow](docs/ba-revision-update-workflow.md) for API, storage, permissions and deployment details.

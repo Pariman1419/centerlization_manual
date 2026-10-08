@@ -1,5 +1,6 @@
 import type { Revision, RevisionReview } from '../types/manual'
 import { RevisionFiles } from './RevisionFiles'
+import { RevisionUpdateLog } from './RevisionUpdateLog'
 import { formatDate, formatDateTime, formatSize, StatusBadge } from './StatusBadge'
 
 interface RevisionHistoryProps {
@@ -13,6 +14,10 @@ interface RevisionHistoryProps {
   onDelete?: (revision: Revision) => void
   canManage?: (revision: Revision) => boolean
   onEdit?: (revision: Revision) => void
+  onUpdate?: (revision: Revision) => void
+  onRequestDevReview?: (revision: Revision) => void
+  onDevReview?: (revision: Revision) => void
+  onReupload?: (revision: Revision) => void
   onWithdraw?: (revision: Revision) => void
 }
 
@@ -28,6 +33,10 @@ export function RevisionHistory({
   canManage,
   onEdit,
   onWithdraw,
+  onUpdate,
+  onRequestDevReview,
+  onDevReview,
+  onReupload,
 }: RevisionHistoryProps) {
   return (
     <section className="panel mt-6">
@@ -46,6 +55,10 @@ export function RevisionHistory({
         <div className="divide-y divide-slate-200">
           {revisions.map(revision => {
             const reviews = reviewsMap[revision.id] || []
+            const devPending = Boolean(revision.dev_review_requested && !revision.dev_reviewed_by)
+            const devNeedsChanges = revision.dev_review_requested && revision.dev_changes_requested === true
+            const canApprove = !devPending && !devNeedsChanges && (
+              revision.status === 'IN_REVIEW' || (revision.status === 'DRAFT' && Boolean(revision.ba_updated_by)))
             return (
               <article key={revision.id} className="px-6 py-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -71,7 +84,7 @@ export function RevisionHistory({
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {(revision.status === 'DRAFT' || revision.status === 'REJECTED') && onSubmitReview && (
+                    {revision.status === 'DRAFT' && !revision.ba_updated_by && onSubmitReview && (
                       <button
                         className="btn-secondary btn-small"
                         aria-label={`Submit REV ${revision.revision_no} for review`}
@@ -91,7 +104,7 @@ export function RevisionHistory({
                             Reject
                           </button>
                         )}
-                        {onApprove && (
+                        {onApprove && canApprove && (
                           <button
                             className="btn-success btn-small"
                             aria-label={`Approve REV ${revision.revision_no}`}
@@ -102,7 +115,7 @@ export function RevisionHistory({
                         )}
                       </>
                     )}
-                    {(revision.status === 'DRAFT' || revision.status === 'REJECTED') && onEdit && canManage?.(revision) && (
+                    {(revision.status === 'DRAFT' || revision.status === 'REJECTED') && !revision.ba_updated_by && !onUpdate && onEdit && canManage?.(revision) && (
                       <button className="btn-secondary btn-small" aria-label={`Edit REV ${revision.revision_no}`} onClick={() => onEdit(revision)}>
                         Edit
                       </button>
@@ -111,6 +124,26 @@ export function RevisionHistory({
                       <button className="btn-secondary btn-small" aria-label={`Withdraw REV ${revision.revision_no} from review`} onClick={() => onWithdraw(revision)}>
                         Withdraw
                       </button>
+                    )}
+                    {onUpdate && ['DRAFT', 'IN_REVIEW', 'REJECTED', 'APPROVED'].includes(revision.status) && (
+                      <button className="btn-secondary btn-small" aria-label={`Update REV ${revision.revision_no}`}
+                        onClick={() => onUpdate(revision)}>Update / Edit</button>
+                    )}
+                    {revision.status === 'DRAFT' && revision.ba_updated_by && canApprove && onApprove && (
+                      <button className="btn-success btn-small" aria-label={`Approve REV ${revision.revision_no}`}
+                        onClick={() => onApprove(revision)}>Approve</button>
+                    )}
+                    {revision.status === 'DRAFT' && revision.ba_updated_by && !revision.dev_review_requested && onRequestDevReview && (
+                      <button className="btn-secondary btn-small" aria-label={`Request Dev review for REV ${revision.revision_no}`}
+                        onClick={() => onRequestDevReview(revision)}>Request Dev Review</button>
+                    )}
+                    {revision.status === 'DRAFT' && devPending && onDevReview && (
+                      <button className="btn-primary btn-small" aria-label={`Review BA update for REV ${revision.revision_no}`}
+                        onClick={() => onDevReview(revision)}>Review BA Update</button>
+                    )}
+                    {revision.status === 'REJECTED' && onReupload && (
+                      <button className="btn-primary btn-small" aria-label={`Upload corrected revision for REV ${revision.revision_no}`}
+                        onClick={() => onReupload(revision)}>Upload Corrected Revision</button>
                     )}
                     {onDelete && canDelete?.(revision) && (
                       <button
@@ -132,6 +165,17 @@ export function RevisionHistory({
                     )}
                   </div>
                 </div>
+
+                {revision.ba_updated_by && <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-4 text-sm">
+                  <p className="font-medium">Updated by BA: {revision.ba_updated_by}
+                    {revision.updated_at ? ` · ${formatDateTime(revision.updated_at)}` : ''}</p>
+                  {devPending && <p className="mt-1 text-amber-800">Waiting for Dev review</p>}
+                  {revision.dev_reviewed_by && <p className="mt-1">
+                    Dev: {revision.dev_reviewed_by} · {revision.dev_changes_requested ? 'Further changes requested — BA must update the draft' : 'No further changes — BA can approve'}
+                  </p>}
+                  {revision.dev_review_comment && <p className="mt-2 whitespace-pre-wrap">{revision.dev_review_comment}</p>}
+                  <RevisionUpdateLog revisionId={revision.id} />
+                </div>}
 
                 {reviews.length > 0 && (
                   <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-4" data-testid={`reviews-${revision.id}`}>

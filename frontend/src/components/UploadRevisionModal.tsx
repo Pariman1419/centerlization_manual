@@ -3,6 +3,7 @@ import { errorMessage, manualsApi } from '../api/manuals'
 import type { Manual, Revision } from '../types/manual'
 import { Dialog } from './Dialog'
 import { formatSize } from './StatusBadge'
+import { RevisionFiles } from './RevisionFiles'
 
 const MAX_BYTES = 50 * 1024 * 1024
 const MAX_OTHER_FILES = 10
@@ -27,8 +28,8 @@ function FileRow({ file, onRemove }: { file: File; onRemove: () => void }) {
   </div>
 }
 
-export function UploadRevisionModal({ manual, onUploaded, onClose }: {
-  manual: Manual; onUploaded: (revision: Revision) => void; onClose: () => void
+export function UploadRevisionModal({ manual, revision, onUploaded, onClose }: {
+  manual: Manual; revision?: Revision; onUploaded: (revision: Revision) => void; onClose: () => void
 }) {
   const [type, setType] = useState<FileType>('PDF')
   const [files, setFiles] = useState<File[]>([])
@@ -65,24 +66,27 @@ export function UploadRevisionModal({ manual, onUploaded, onClose }: {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (busy) return
-    if (files.length === 0) { setError('Select a file to upload.'); return }
+    if (!revision && files.length === 0) { setError('Select a file to upload.'); return }
     const form = new FormData(event.currentTarget)
     const data = new FormData()
-    data.set('revision_no', String(form.get('revision_no') ?? ''))
+    if (revision) data.set('expected_version', String(revision.content_version ?? 0))
+    else data.set('revision_no', String(form.get('revision_no') ?? ''))
     data.set('revision_detail', String(form.get('revision_detail') ?? ''))
-    if (type === 'PDF') data.set('pdf_file', files[0])
-    else if (type === 'WORD') data.set('word_file', files[0])
-    else {
-      if (!otherType.trim()) { setError('Describe what the Other file is.'); return }
-      data.set('other_type', otherType.trim())
-      files.forEach(file => data.append('other_files', file))
+    if (files.length > 0) {
+      if (type === 'PDF') data.set('pdf_file', files[0])
+      else if (type === 'WORD') data.set('word_file', files[0])
+      else {
+        if (!otherType.trim()) { setError('Describe what the Other file is.'); return }
+        data.set('other_type', otherType.trim())
+        files.forEach(file => data.append('other_files', file))
+      }
     }
     setBusy(true); setError('')
-    try { onUploaded(await manualsApi.upload(manual.id, data)) }
+    try { onUploaded(await (revision ? manualsApi.replaceFiles(revision.id, data) : manualsApi.upload(manual.id, data))) }
     catch (err) { setError(errorMessage(err)) }
     finally { setBusy(false) }
   }
-  return <Dialog title="Upload New Revision" onClose={onClose} busy={busy}>
+  return <Dialog title={revision ? `Update REV ${revision.revision_no}` : "Upload New Revision"} onClose={onClose} busy={busy}>
     <form onSubmit={submit}>
       <fieldset disabled={busy} className="space-y-5 px-6 py-5">
         <div className="rounded-md bg-slate-50 p-3 text-sm">
@@ -90,8 +94,12 @@ export function UploadRevisionModal({ manual, onUploaded, onClose }: {
           <p className="font-medium text-slate-800">{manual.title}</p>
           <p className="mt-1 text-slate-500">{manual.manual_code} · Current: {manual.current_revision ? `REV ${manual.current_revision.revision_no}` : 'No published revision'}</p>
         </div>
-        <label className="field">Revision Number<input name="revision_no" required maxLength={50} placeholder="04" autoFocus pattern="[A-Za-z0-9][A-Za-z0-9_.-]*" /></label>
-        <label className="field">Revision Detail<textarea name="revision_detail" rows={4} maxLength={20000} placeholder="Describe what changed in this revision." /></label>
+        {revision ? <div className="space-y-2 text-sm">
+          <p className="font-semibold">Revision Number: {revision.revision_no} (unchanged)</p>
+          <p>Selected files replace the same file type. Other file types are kept. Previous approvals and Dev feedback do not apply to this update.</p>
+          <RevisionFiles revision={revision} />
+        </div> : <label className="field">Revision Number<input name="revision_no" required maxLength={50} placeholder="04" autoFocus pattern="[A-Za-z0-9][A-Za-z0-9_.-]*" /></label>}
+        <label className="field">Revision Detail<textarea name="revision_detail" defaultValue={revision?.revision_detail ?? ''} rows={4} maxLength={20000} placeholder="Describe what changed in this revision." /></label>
         <label className="field">Type
           <select value={type} onChange={event => changeType(event.target.value as FileType)}>
             <option value="PDF">PDF</option>
@@ -117,11 +125,11 @@ export function UploadRevisionModal({ manual, onUploaded, onClose }: {
           </div>
           {files.map((file, index) => <FileRow key={`${file.name}-${index}`} file={file} onRemove={() => setFiles(files.filter((_, i) => i !== index))} />)}
         </div>
-        <p className="text-xs text-slate-500">Uploads are saved as drafts. Publish the revision when it is ready for use.</p>
+        <p className="text-xs text-slate-500">Updates and uploads are saved as drafts. BA approves the latest files before publishing.</p>
         {error && <p role="alert" className="error">{error}</p>}
       </fieldset>
       <div className="modal-footer"><button type="button" className="btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
-        <button className="btn-primary" disabled={busy}>{busy ? 'Uploading…' : 'Upload Draft'}</button></div>
+        <button className="btn-primary" disabled={busy}>{busy ? 'Uploading…' : revision ? 'Save Update' : 'Upload Draft'}</button></div>
     </form>
   </Dialog>
 }

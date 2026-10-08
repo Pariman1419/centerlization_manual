@@ -9,6 +9,22 @@ export interface RevisionReview {
   created_at: string
 }
 
+export interface RevisionUpdateEvent {
+  id: number
+  action: 'REVISION_UPDATED' | 'DEV_REVIEW_REQUESTED' | 'DEV_REVIEW_COMPLETED'
+  actor_username: string | null
+  created_at: string
+  details: {
+    content_version?: number
+    revision_detail?: string | null
+    previous_detail?: string | null
+    previous_files?: { kind: string; file_name: string }[]
+    files?: { kind: string; file_name: string }[]
+    changes_requested?: boolean
+    comment?: string
+  } | null
+}
+
 export interface RevisionFile {
   id: number
   kind: 'WORD' | 'PDF' | 'OTHER'
@@ -30,6 +46,14 @@ export interface Revision {
   status: string
   uploaded_by: string
   uploaded_at: string
+  content_version?: number
+  ba_updated_by?: string | null
+  updated_at?: string | null
+  dev_review_requested?: boolean
+  dev_reviewed_by?: string | null
+  dev_reviewed_at?: string | null
+  dev_changes_requested?: boolean | null
+  dev_review_comment?: string | null
   submitted_by?: string | null
   submitted_at?: string | null
   published_by: string | null
