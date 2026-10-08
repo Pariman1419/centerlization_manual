@@ -1,0 +1,31 @@
+services:
+  backend:
+    build: ./backend
+    container_name: manual-backend
+    env_file: ./backend/.env
+    networks:
+      - default
+      - minio
+      - redis
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: manual-frontend
+    ports:
+      - "8013:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - default
+
+networks:
+  default:
+    name: manual_default
+  minio:
+    name: shared-minio_default
+    external: true
+  redis:
+    name: redis_default
+    external: true
