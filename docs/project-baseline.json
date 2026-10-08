@@ -1,0 +1,408 @@
+{
+  "tables": {
+    "manuals": {
+      "columns": [
+        [
+          "id",
+          "BIGINT",
+          false
+        ],
+        [
+          "manual_code",
+          "VARCHAR(100)",
+          false
+        ],
+        [
+          "title",
+          "VARCHAR(255)",
+          false
+        ],
+        [
+          "category",
+          "VARCHAR(100)",
+          true
+        ],
+        [
+          "description",
+          "TEXT",
+          true
+        ],
+        [
+          "current_revision_id",
+          "BIGINT",
+          true
+        ],
+        [
+          "status",
+          "VARCHAR(20)",
+          false
+        ],
+        [
+          "created_by",
+          "VARCHAR(100)",
+          false
+        ],
+        [
+          "created_at",
+          "TIMESTAMP",
+          false
+        ],
+        [
+          "updated_at",
+          "TIMESTAMP",
+          false
+        ]
+      ],
+      "pk": {
+        "constrained_columns": [
+          "id"
+        ],
+        "name": "manuals_pkey",
+        "comment": null,
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      "fk": [
+        {
+          "name": "fk_manuals_current_revision",
+          "constrained_columns": [
+            "current_revision_id"
+          ],
+          "referred_schema": null,
+          "referred_table": "manual_revisions",
+          "referred_columns": [
+            "id"
+          ],
+          "options": {
+            "ondelete": "SET NULL"
+          },
+          "comment": null
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_manuals_category",
+          "unique": false,
+          "column_names": [
+            "category"
+          ],
+          "dialect_options": {
+            "postgresql_include": []
+          }
+        },
+        {
+          "name": "idx_manuals_created_at",
+          "unique": false,
+          "column_names": [
+            "created_at"
+          ],
+          "column_sorting": {
+            "created_at": [
+              "desc"
+            ]
+          },
+          "dialect_options": {
+            "postgresql_include": []
+          }
+        },
+        {
+          "name": "idx_manuals_status",
+          "unique": false,
+          "column_names": [
+            "status"
+          ],
+          "dialect_options": {
+            "postgresql_include": []
+          }
+        },
+        {
+          "name": "idx_manuals_title",
+          "unique": false,
+          "column_names": [
+            "title"
+          ],
+          "dialect_options": {
+            "postgresql_include": []
+          }
+        },
+        {
+          "name": "uq_manuals_manual_code",
+          "unique": true,
+          "column_names": [
+            "manual_code"
+          ],
+          "duplicates_constraint": "uq_manuals_manual_code",
+          "dialect_options": {
+            "postgresql_include": []
+          }
+        }
+      ],
+      "unique": [
+        {
+          "column_names": [
+            "manual_code"
+          ],
+          "name": "uq_manuals_manual_code",
+          "comment": null,
+          "dialect_options": {
+            "postgresql_include": [],
+            "postgresql_nulls_not_distinct": false
+          }
+        }
+      ],
+      "checks": [
+        {
+          "name": "chk_manuals_status",
+          "sqltext": "status::text = ANY (ARRAY['ACTIVE'::character varying, 'INACTIVE'::character varying, 'ARCHIVED'::character varying, 'DRAFT'::character varying, 'PUBLISHED'::character varying]::text[])",
+          "comment": null
+        }
+      ],
+      "count": 1
+    },
+    "manual_revisions": {
+      "columns": [
+        [
+          "id",
+          "BIGINT",
+          false
+        ],
+        [
+          "manual_id",
+          "BIGINT",
+          false
+        ],
+        [
+          "revision_no",
+          "VARCHAR(50)",
+          false
+        ],
+        [
+          "revision_detail",
+          "TEXT",
+          true
+        ],
+        [
+          "file_name",
+          "VARCHAR(255)",
+          false
+        ],
+        [
+          "object_key",
+          "VARCHAR(1000)",
+          false
+        ],
+        [
+          "file_size",
+          "BIGINT",
+          true
+        ],
+        [
+          "mime_type",
+          "VARCHAR(100)",
+          true
+        ],
+        [
+          "checksum",
+          "VARCHAR(128)",
+          true
+        ],
+        [
+          "status",
+          "VARCHAR(20)",
+          false
+        ],
+        [
+          "uploaded_by",
+          "VARCHAR(100)",
+          false
+        ],
+        [
+          "uploaded_at",
+          "TIMESTAMP",
+          false
+        ],
+        [
+          "published_by",
+          "VARCHAR(100)",
+          true
+        ],
+        [
+          "published_at",
+          "TIMESTAMP",
+          true
+        ]
+      ],
+      "pk": {
+        "constrained_columns": [
+          "id"
+        ],
+        "name": "manual_revisions_pkey",
+        "comment": null,
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      "fk": [
+        {
+          "name": "fk_manual_revisions_manual",
+          "constrained_columns": [
+            "manual_id"
+          ],
+          "referred_schema": null,
+          "referred_table": "manuals",
+          "referred_columns": [
+            "id"
+          ],
+          "options": {
+            "ondelete": "CASCADE"
+          },
+          "comment": null
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_manual_revisions_manual_id",
+          "unique": false,
+          "column_names": [
+            "manual_id"
+          ],
+          "dialect_options": {
+            "postgresql_include": []
+          }
+        },
+        {
+          "name": "idx_manual_revisions_manual_uploaded",
+          "unique": false,
+          "column_names": [
+            "manual_id",
+            "uploaded_at"
+          ],
+          "column_sorting": {
+            "uploaded_at": [
+              "desc"
+            ]
+          },
+          "dialect_options": {
+            "postgresql_include": []
+          }
+        },
+        {
+          "name": "idx_manual_revisions_object_key",
+          "unique": false,
+          "column_names": [
+            "object_key"
+          ],
+          "dialect_options": {
+            "postgresql_include": []
+          }
+        },
+        {
+          "name": "idx_manual_revisions_status",
+          "unique": false,
+          "column_names": [
+            "status"
+          ],
+          "dialect_options": {
+            "postgresql_include": []
+          }
+        },
+        {
+          "name": "idx_manual_revisions_uploaded_at",
+          "unique": false,
+          "column_names": [
+            "uploaded_at"
+          ],
+          "column_sorting": {
+            "uploaded_at": [
+              "desc"
+            ]
+          },
+          "dialect_options": {
+            "postgresql_include": []
+          }
+        },
+        {
+          "name": "uq_manual_revision",
+          "unique": true,
+          "column_names": [
+            "manual_id",
+            "revision_no"
+          ],
+          "duplicates_constraint": "uq_manual_revision",
+          "dialect_options": {
+            "postgresql_include": []
+          }
+        },
+        {
+          "name": "uq_manual_revisions_one_published",
+          "unique": true,
+          "column_names": [
+            "manual_id"
+          ],
+          "dialect_options": {
+            "postgresql_where": "((status)::text = 'PUBLISHED'::text)",
+            "postgresql_include": []
+          }
+        }
+      ],
+      "unique": [
+        {
+          "column_names": [
+            "manual_id",
+            "revision_no"
+          ],
+          "name": "uq_manual_revision",
+          "comment": null,
+          "dialect_options": {
+            "postgresql_include": [],
+            "postgresql_nulls_not_distinct": false
+          }
+        }
+      ],
+      "checks": [
+        {
+          "name": "chk_manual_revision_file_size",
+          "sqltext": "file_size IS NULL OR file_size >= 0",
+          "comment": null
+        },
+        {
+          "name": "chk_manual_revision_status",
+          "sqltext": "status::text = ANY (ARRAY['DRAFT'::character varying, 'PUBLISHED'::character varying, 'ARCHIVED'::character varying]::text[])",
+          "comment": null
+        }
+      ],
+      "count": 2
+    }
+  },
+  "manuals": [
+    {
+      "id": 1,
+      "manual_code": "SMOKE-20261007-041544-1d2808",
+      "status": "PUBLISHED",
+      "current_revision_id": 2
+    }
+  ],
+  "revisions": [
+    {
+      "id": 1,
+      "manual_id": 1,
+      "revision_no": "01",
+      "object_key": "SMOKE-20261007-041544-1d2808/rev-001/45494840-4292-47e9-9bcd-7d41fdf2424f.pdf",
+      "checksum": "0356e4fda7ccff256d84d9486360d26fa8cb6fa1cb5045fac9b8b61aa3991d67",
+      "status": "ARCHIVED",
+      "content_sha256": "0356e4fda7ccff256d84d9486360d26fa8cb6fa1cb5045fac9b8b61aa3991d67",
+      "size": 431
+    },
+    {
+      "id": 2,
+      "manual_id": 1,
+      "revision_no": "02",
+      "object_key": "SMOKE-20261007-041544-1d2808/rev-002/91cefff1-19d0-4a07-bf28-5d6181ce14d1.pdf",
+      "checksum": "0356e4fda7ccff256d84d9486360d26fa8cb6fa1cb5045fac9b8b61aa3991d67",
+      "status": "PUBLISHED",
+      "content_sha256": "0356e4fda7ccff256d84d9486360d26fa8cb6fa1cb5045fac9b8b61aa3991d67",
+      "size": 431
+    }
+  ]
+}

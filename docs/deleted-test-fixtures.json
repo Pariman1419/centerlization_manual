@@ -1,0 +1,47 @@
+{
+  "authorization": "User explicitly requested deletion of these test Projects and documents",
+  "projects": [
+    {
+      "id": 1,
+      "project_code": "LEGACY"
+    },
+    {
+      "id": 3,
+      "project_code": "PRJ-PLATING"
+    }
+  ],
+  "manuals": [
+    {
+      "id": 1,
+      "manual_code": "SMOKE-20261007-041544-1d2808",
+      "project_id": 1
+    },
+    {
+      "id": 3,
+      "manual_code": "MAN-PLATING-001",
+      "project_id": 3
+    }
+  ],
+  "revisions": [
+    {
+      "id": 1,
+      "manual_id": 1,
+      "object_key": "SMOKE-20261007-041544-1d2808/rev-001/45494840-4292-47e9-9bcd-7d41fdf2424f.pdf"
+    },
+    {
+      "id": 2,
+      "manual_id": 1,
+      "object_key": "SMOKE-20261007-041544-1d2808/rev-002/91cefff1-19d0-4a07-bf28-5d6181ce14d1.pdf"
+    },
+    {
+      "id": 3,
+      "manual_id": 3,
+      "object_key": "PRJ-PLATING/MAN-PLATING-001/rev-001/ca9396fe-12e3-4992-b4b7-5f3d15d04fd7.pdf"
+    },
+    {
+      "id": 4,
+      "manual_id": 3,
+      "object_key": "PRJ-PLATING/MAN-PLATING-001/rev-002/fb32f0ff-116b-457f-adb2-7612c121da44.pdf"
+    }
+  ]
+}
