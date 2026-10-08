@@ -4,6 +4,7 @@ import { errorMessage } from '../api/manuals'
 import type { User } from '../types/user'
 import { FolderArtwork } from '../components/FolderArtwork'
 import { Icon } from '../components/Icon'
+import { ForgotPasswordDialog } from '../components/ForgotPasswordDialog'
 
 export function LoginPage({onLoggedIn}:{onLoggedIn:(user:User)=>void}) {
   const [busy,setBusy] = useState(false)
@@ -39,9 +40,9 @@ export function LoginPage({onLoggedIn}:{onLoggedIn:(user:User)=>void}) {
         {error && <p role="alert" className="error">{error}</p>}
         <button className="btn-primary w-full" disabled={busy}>{busy ? 'Logging in…' : 'Log in'}</button>
       </fieldset></form>
-      <button type="button" className="mt-4 text-sm text-blue-800 underline" aria-expanded={forgot} onClick={() => setForgot(value => !value)}>Forgot password?</button>
-      {forgot && <p role="status" className="mt-2 text-sm text-slate-600">Please contact the system administrator to reset your password.</p>}
+      <button type="button" className="mt-4 text-sm text-blue-800 underline" onClick={() => setForgot(true)}>Forgot password?</button>
       <p className="mt-6 text-xs leading-5 text-slate-500">Contact your administrator if you need an account.</p>
     </div></div>
+    {forgot && <ForgotPasswordDialog onClose={() => setForgot(false)} />}
   </main>
 }

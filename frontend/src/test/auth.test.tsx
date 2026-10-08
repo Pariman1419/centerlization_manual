@@ -66,12 +66,16 @@ it('returns to Login when a protected API session expires', async () => {
 })
 
 
-it('shows contact-administrator message for Forgot password without calling the API', async () => {
+it('confirms which account needs a reset for Forgot password without calling the API', async () => {
   const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response({detail:'Please log in'},401))
   render(<MemoryRouter initialEntries={['/login']}><App /></MemoryRouter>)
   const actions = userEvent.setup()
   await actions.click(await screen.findByRole('button', {name:'Forgot password?'}))
-  expect(screen.getByText('Please contact the system administrator to reset your password.')).toBeInTheDocument()
+  const dialog = screen.getByRole('dialog', {name:'Forgot Password'})
+  await actions.type(within(dialog).getByLabelText('Username'), 'ba01')
+  await actions.click(within(dialog).getByRole('button', {name:'Confirm'}))
+  expect(within(dialog).getByText('ba01')).toBeInTheDocument()
+  expect(within(dialog).getByText('Only an administrator can reset a password.')).toBeInTheDocument()
   expect(fetchMock.mock.calls.every(call => String(call[0]) === '/api/auth/me')).toBe(true)
 })
 
