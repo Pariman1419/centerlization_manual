@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.auth import accessible_project, get_current_user
+from app.auth import PROJECT_MANAGER_ROLES, accessible_project, get_current_user
 from app.database import get_db
 from app.models.manual import Manual, utcnow
 from app.models.manual_revision import ManualRevision
@@ -164,11 +164,11 @@ DELETABLE_STATUSES = ('DRAFT', 'REJECTED')
 
 
 def require_revision_manager(db, revision_id, user, action, owner_field='uploaded_by'):
-    """CONTRIBUTOR may act on revisions they own (uploaded or submitted); OWNER/ADMIN on any."""
+    """CONTRIBUTOR may act on their own revisions; combined BA/Reviewer and ADMIN on any."""
     revision = require_revision(db, revision_id, user, min_role='CONTRIBUTOR')
     manual = db.get(Manual, revision.manual_id)
     role = accessible_project(db, manual.project_id, user, min_role='CONTRIBUTOR').my_role
-    if role not in ('OWNER', 'ADMIN') and user.username not in (revision.uploaded_by, getattr(revision, owner_field)):
+    if role not in PROJECT_MANAGER_ROLES and user.username not in (revision.uploaded_by, getattr(revision, owner_field)):
         raise HTTPException(403, f'You can only {action} revisions you uploaded')
     return revision, manual
 

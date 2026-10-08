@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { DetailNavigation } from '../components/DetailNavigation'
 import { errorMessage } from '../api/manuals'
-import { projectsApi } from '../api/projects'
+import { projectsApi, type ProjectMemberCandidate } from '../api/projects'
 import { Dialog } from '../components/Dialog'
 import { ManualForm } from '../components/ManualForm'
 import { ManualsList } from '../components/ManualsList'
@@ -9,13 +10,25 @@ import { StatusBadge } from '../components/StatusBadge'
 import type { Manual } from '../types/manual'
 import { atLeast } from '../lib/permissions'
 import type { Project, ProjectMember, ProjectRole } from '../types/project'
+import type { SystemRole } from '../types/user'
+
+const DEFAULT_MEMBER_ROLE: Record<SystemRole, ProjectRole> = {
+  BA: 'OWNER', DEV: 'CONTRIBUTOR', USER: 'VIEWER', ADMIN: 'ADMIN',
+}
 
 const ROLE_OPTIONS: { value: ProjectRole; label: string }[] = [
-  { value: 'OWNER', label: 'BA / Owner (Manage, Draft, Approve & Publish)' },
+  { value: 'ADMIN', label: 'Admin (Full project access)' },
+  { value: 'OWNER', label: 'BA / Reviewer (Manage, Draft, Approve, Reject & Publish)' },
   { value: 'CONTRIBUTOR', label: 'Dev / Contributor (Create, Draft SOP, Submit)' },
-  { value: 'REVIEWER', label: 'Reviewer (Review, Approve & Reject)' },
   { value: 'VIEWER', label: 'User / Viewer (Read & Download published manuals)' },
 ]
+
+function editableMemberRole(role: ProjectRole): ProjectRole {
+  if (role === 'BA' || role === 'REVIEWER') return 'OWNER'
+  if (role === 'DEV') return 'CONTRIBUTOR'
+  if (role === 'USER') return 'VIEWER'
+  return role
+}
 
 export function ProjectDetailPage() {
   const { projectId } = useParams()
@@ -50,6 +63,27 @@ export function ProjectDetailPage() {
   const [removingMember, setRemovingMember] = useState<ProjectMember | null>(null)
   const [busy, setBusy] = useState(false)
   const [memberFormError, setMemberFormError] = useState('')
+  const [candidates, setCandidates] = useState<ProjectMemberCandidate[]>([])
+  const [candidatesLoading, setCandidatesLoading] = useState(true)
+  const [candidatesError, setCandidatesError] = useState('')
+  const [candidatesReload, setCandidatesReload] = useState(0)
+  const [selectedUserId, setSelectedUserId] = useState('')
+  const [newMemberRole, setNewMemberRole] = useState<ProjectRole>('VIEWER')
+
+  useEffect(() => {
+    if (!addingMember) return
+    let active = true
+    setCandidatesLoading(true)
+    setCandidatesError('')
+    setCandidates([])
+    setSelectedUserId('')
+    setNewMemberRole('VIEWER')
+    projectsApi.memberCandidates(id)
+      .then(users => { if (active) setCandidates(users) })
+      .catch(err => { if (active) setCandidatesError(errorMessage(err)) })
+      .finally(() => { if (active) setCandidatesLoading(false) })
+    return () => { active = false }
+  }, [addingMember, id, candidatesReload])
 
   useEffect(() => {
     let active = true
@@ -87,17 +121,17 @@ export function ProjectDetailPage() {
 
   async function handleAddMember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (busy) return
+    const selectedUser = candidates.find(user => String(user.id) === selectedUserId)
+    if (busy || candidatesLoading || candidatesError || !selectedUser) return
     const form = event.currentTarget
     const data = new FormData(form)
-    const username = String(data.get('username') || '').trim()
     const role = String(data.get('role') || 'VIEWER') as ProjectRole
     setBusy(true)
     setMemberFormError('')
     try {
-      await projectsApi.addMember(id, { username, role })
+      await projectsApi.addMember(id, { user_id: selectedUser.id, role })
       setAddingMember(false)
-      setNotice(`Added ${username} to project members.`)
+      setNotice(`Added ${selectedUser.username} to project members.`)
       setReload(r => r + 1)
     } catch (err) {
       setMemberFormError(errorMessage(err))
@@ -144,10 +178,10 @@ export function ProjectDetailPage() {
   }
 
   return <>
-    <nav aria-label="Breadcrumb" className="mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-      <Link to="/projects" className="hover:text-blue-800">Projects</Link>
-      {project && <><span aria-hidden="true">/</span><span aria-current="page">{project.project_name}</span></>}
-    </nav>
+    <DetailNavigation backTo="/projects" backLabel="Back to Projects" items={project ? [
+      { label: 'Projects', to: '/projects' },
+      { label: project.project_name },
+    ] : []} />
     {location.state?.message && (
       <p role="status" className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
         {location.state.message}
@@ -253,7 +287,7 @@ export function ProjectDetailPage() {
             {canManageMembers && (
               <button
                 className="btn-primary"
-                onClick={() => { setMemberFormError(''); setAddingMember(true) }}
+                onClick={() => { setMemberFormError(''); setCandidatesLoading(true); setAddingMember(true) }}
               >
                 <span aria-hidden="true">+</span> Add Member
               </button>
@@ -286,7 +320,7 @@ export function ProjectDetailPage() {
                       <td className="px-5 py-4 text-slate-600">{member.display_name}</td>
                       <td className="px-5 py-4">
                         <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-800 border border-slate-200">
-                          {member.role === 'OWNER' ? 'BA / Owner' : member.role === 'CONTRIBUTOR' ? 'Dev / Contributor' : member.role}
+                          {ROLE_OPTIONS.find(option => option.value === editableMemberRole(member.role))?.label.split(' (')[0] ?? member.role}
                         </span>
                       </td>
                       {canManageMembers && (
@@ -328,18 +362,35 @@ export function ProjectDetailPage() {
           <form onSubmit={handleAddMember}>
             <fieldset disabled={busy} className="space-y-4 px-6 py-5">
               <label className="field">
-                Username
-                <input
-                  name="username"
+                User
+                <select
+                  name="user_id"
                   required
-                  maxLength={100}
-                  placeholder="e.g. jdoe"
+                  value={selectedUserId}
+                  onChange={event => {
+                    const userId = event.target.value
+                    setSelectedUserId(userId)
+                    const user = candidates.find(candidate => String(candidate.id) === userId)
+                    setNewMemberRole(user ? DEFAULT_MEMBER_ROLE[user.role] ?? 'VIEWER' : 'VIEWER')
+                  }}
+                  disabled={candidatesLoading || !!candidatesError || candidates.length === 0}
+                  aria-describedby="member-user-help"
                   autoFocus
-                />
+                >
+                  <option value="" disabled>{candidatesLoading ? 'Loading users…' : 'Select a user'}</option>
+                  {candidates.map(user => <option key={user.id} value={user.id}>{user.display_name} ({user.username})</option>)}
+                </select>
               </label>
+              <p id="member-user-help" className="text-sm text-slate-500">Choose an existing active user. Current project members are excluded.</p>
+              {candidatesLoading && <p role="status" className="text-sm text-slate-500">Loading users…</p>}
+              {candidatesError && <div role="alert" className="error flex flex-wrap items-center justify-between gap-3">
+                <p>{candidatesError}</p>
+                <button type="button" className="btn-secondary btn-small" onClick={() => setCandidatesReload(value => value + 1)}>Retry</button>
+              </div>}
+              {!candidatesLoading && !candidatesError && candidates.length === 0 && <p role="status" className="text-sm text-slate-600">No active users available to add.</p>}
               <label className="field">
                 Role (บทบาทในโปรเจกต์)
-                <select name="role" defaultValue="VIEWER">
+                <select name="role" value={newMemberRole} onChange={event => setNewMemberRole(event.target.value as ProjectRole)}>
                   {ROLE_OPTIONS.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
@@ -351,7 +402,7 @@ export function ProjectDetailPage() {
               <button type="button" className="btn-secondary" disabled={busy} onClick={() => setAddingMember(false)}>
                 Cancel
               </button>
-              <button className="btn-primary" disabled={busy}>
+              <button className="btn-primary" disabled={busy || candidatesLoading || !!candidatesError || !selectedUserId}>
                 {busy ? 'Adding…' : 'Add Member'}
               </button>
             </div>
@@ -373,7 +424,7 @@ export function ProjectDetailPage() {
               </p>
               <label className="field">
                 Role (บทบาทในโปรเจกต์)
-                <select name="role" defaultValue={editingMember.role}>
+                <select name="role" defaultValue={editableMemberRole(editingMember.role)}>
                   {ROLE_OPTIONS.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}

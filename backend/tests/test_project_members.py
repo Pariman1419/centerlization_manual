@@ -70,17 +70,72 @@ def test_creator_becomes_owner(auth_users):
     assert members[0]['role'] == 'OWNER'
 
 
-def test_project_delete_requires_owner_or_admin(auth_users):
+def test_member_candidates_only_include_active_nonmembers(auth_users):
+    client, db, _, users = auth_users
+    login(client, 'owner')
+    project = client.post('/api/projects', json={'project_code': 'PICK-USERS', 'project_name': 'Picker'}).json()
+    client.post(f'/api/projects/{project["id"]}/members', json={'user_id': users['viewer'].id, 'role': 'VIEWER'})
+    users['outsider'].is_active = False
+    db.commit()
+    response = client.get(f'/api/projects/{project["id"]}/member-candidates')
+    assert response.status_code == 200
+    candidates = response.json()
+    assert {row['username'] for row in candidates} == {'BA', 'admin', 'contributor', 'reviewer', 'extra_owner'}
+    assert all(set(row) == {'id', 'username', 'display_name', 'role'} for row in candidates)
+    assert next(row for row in candidates if row['username'] == 'admin')['role'] == 'ADMIN'
+    assert [row['username'] for row in candidates] == sorted(row['username'] for row in candidates)
+
+
+def test_member_candidates_require_owner_or_admin(auth_users):
+    client, _, _, users = auth_users
+    login(client, 'owner')
+    project = client.post('/api/projects', json={'project_code': 'PICK-AUTH', 'project_name': 'Picker'}).json()
+    client.post(f'/api/projects/{project["id"]}/members', json={'user_id': users['viewer'].id, 'role': 'VIEWER'})
+    endpoint = f'/api/projects/{project["id"]}/member-candidates'
+    login(client, 'viewer')
+    assert client.get(endpoint).status_code == 403
+    login(client, 'outsider')
+    assert client.get(endpoint).status_code == 404
+    login(client, 'admin')
+    assert client.get(endpoint).status_code == 200
+
+
+def test_project_admin_can_manage_project_but_is_not_system_admin(auth_users):
+    client, _, _, users = auth_users
+    login(client, 'owner')
+    project = client.post('/api/projects', json={'project_code': 'LOCAL-ADMIN', 'project_name': 'Admin Project'}).json()
+    response = client.post(f'/api/projects/{project["id"]}/members', json={'user_id': users['viewer'].id, 'role': 'ADMIN'})
+    assert response.status_code == 201
+    assert response.json()['role'] == 'ADMIN'
+    login(client, 'viewer')
+    assert client.get(f'/api/projects/{project["id"]}').json()['my_role'] == 'ADMIN'
+    assert client.put(f'/api/projects/{project["id"]}', json={'project_name': 'Updated'}).status_code == 200
+    assert client.post(f'/api/projects/{project["id"]}/members', json={'user_id': users['outsider'].id, 'role': 'VIEWER'}).status_code == 201
+    assert client.get('/api/users').status_code == 403
+
+
+def test_owner_can_be_promoted_to_admin_and_last_admin_is_protected(auth_users):
+    client, _, _, users = auth_users
+    login(client, 'owner')
+    project = client.post('/api/projects', json={'project_code': 'ADMIN-GUARD', 'project_name': 'Guard'}).json()
+    endpoint = f'/api/projects/{project["id"]}/members/{users["owner"].id}'
+    assert client.put(endpoint, json={'role': 'ADMIN'}).status_code == 200
+    assert client.put(endpoint, json={'role': 'VIEWER'}).status_code == 409
+    assert client.delete(endpoint).status_code == 409
+
+
+@pytest.mark.parametrize('manager', ['owner', 'reviewer', 'admin'])
+def test_project_delete_requires_combined_ba_reviewer_or_admin(auth_users, manager):
     client, db, _, users = auth_users
     login(client, 'owner')
     project = client.post('/api/projects', json={'project_code': 'DELETE-ME', 'project_name': 'Delete Me'}).json()
     for role in ('viewer', 'contributor', 'reviewer'):
         db.add(ProjectMember(project_id=project['id'], user_id=users[role].id, role=role.upper()))
     db.commit()
-    for username in ('viewer', 'contributor', 'reviewer', 'outsider'):
+    for username in ('viewer', 'contributor', 'outsider'):
         login(client, username)
         assert client.delete(f'/api/projects/{project["id"]}').status_code in (403, 404)
-    login(client, 'owner')
+    login(client, manager)
     assert client.delete(f'/api/projects/{project["id"]}').status_code == 200
 
 

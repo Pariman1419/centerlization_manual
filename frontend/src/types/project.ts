@@ -1,4 +1,4 @@
-export type ProjectRole = 'OWNER' | 'REVIEWER' | 'CONTRIBUTOR' | 'VIEWER' | 'BA' | 'DEV' | 'USER'
+export type ProjectRole = 'ADMIN' | 'OWNER' | 'REVIEWER' | 'CONTRIBUTOR' | 'VIEWER' | 'BA' | 'DEV' | 'USER'
 
 export interface ProjectMember {
   id: number

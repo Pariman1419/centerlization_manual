@@ -1,6 +1,9 @@
 import { request } from './manuals'
 import type { Project, ProjectInput, ProjectMember, ProjectRole } from '../types/project'
 import type { Manual } from '../types/manual'
+import type { SystemRole } from '../types/user'
+
+export interface ProjectMemberCandidate { id: number; username: string; display_name: string; role: SystemRole }
 
 export const projectsApi = {
   list: () => request<Project[]>('/projects'),
@@ -14,6 +17,7 @@ export const projectsApi = {
   }),
   manuals: (id: number) => request<Manual[]>(`/projects/${id}/manuals`),
   members: (id: number) => request<ProjectMember[]>(`/projects/${id}/members`),
+  memberCandidates: (id: number) => request<ProjectMemberCandidate[]>(`/projects/${id}/member-candidates`),
   addMember: (id: number, input: { user_id?: number; username?: string; role: ProjectRole }) => request<ProjectMember>(`/projects/${id}/members`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
   }),

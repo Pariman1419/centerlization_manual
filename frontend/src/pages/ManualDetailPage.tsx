@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { errorMessage, manualsApi } from '../api/manuals'
 import { projectsApi } from '../api/projects'
 import { atLeast, type EffectiveRole } from '../lib/permissions'
@@ -11,6 +11,7 @@ import { formatDate, StatusBadge } from '../components/StatusBadge'
 import { UploadRevisionModal } from '../components/UploadRevisionModal'
 import { RevisionStepper } from '../components/RevisionStepper'
 import { UserText } from '../components/UserText'
+import { DetailNavigation } from '../components/DetailNavigation'
 import type { Manual, Revision, RevisionReview } from '../types/manual'
 
 export function ManualDetailPage({ currentUsername }: { currentUsername?: string } = {}) {
@@ -249,12 +250,15 @@ export function ManualDetailPage({ currentUsername }: { currentUsername?: string
 
   return (
     <>
-      <Link
-        to={manual ? `/projects/${manual.project_id}` : '/projects'}
-        className="mb-6 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-blue-800"
-      >
-        <span aria-hidden="true">←</span> {manual ? 'Back to Project' : 'Back to Projects'}
-      </Link>
+      <DetailNavigation
+        backTo={manual ? `/projects/${manual.project_id}` : '/projects'}
+        backLabel={manual ? `Back to ${manual.project_name}` : 'Back to Projects'}
+        items={manual ? [
+          { label: 'Projects', to: '/projects' },
+          { label: manual.project_name, to: `/projects/${manual.project_id}` },
+          { label: manual.title },
+        ] : []}
+      />
       {message && (
         <p role="status" className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           {message}
@@ -271,20 +275,6 @@ export function ManualDetailPage({ currentUsername }: { currentUsername?: string
       {loading && <p className="py-10 text-center text-slate-500">Loading manual…</p>}
       {!loading && !error && manual && (
         <>
-          <Link to={`/projects/${manual.project_id}`} className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-blue-800 hover:underline">
-            <span aria-hidden="true">←</span> Back to {manual.project_name}
-          </Link>
-          <nav aria-label="Breadcrumb" className="mb-5 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-            <Link to="/projects" className="hover:text-blue-800">
-              Projects
-            </Link>
-            <span aria-hidden="true">/</span>
-            <Link to={`/projects/${manual.project_id}`} className="hover:text-blue-800">
-              {manual.project_name}
-            </Link>
-            <span aria-hidden="true">/</span>
-            <span aria-current="page">{manual.title}</span>
-          </nav>
           <div className="detail-heading panel mb-6 flex flex-wrap items-start justify-between gap-5 p-6">
             <div className="min-w-0">
               <UserText as="h1" className="break-words text-3xl font-semibold tracking-tight text-slate-900" text={manual.title}>{manual.title}</UserText>

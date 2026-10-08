@@ -78,6 +78,10 @@ $env:PYTHONPATH='.'
 
 ## API
 
+Project member roles are Admin (full project access), BA / Reviewer (manage, draft, approve, reject, and publish), Dev / Contributor, and User / Viewer. Existing `REVIEWER` members share the BA / Owner permissions. Project Admin does not grant system account administration. Add Member defaults to the selected user's system role and allows an override.
+
+Older deployments whose `project_members` role constraint excludes `ADMIN` must apply `010_project_admin_role.sql` with `scripts/migrate.py` before assigning that role. The migration extends the constraint without changing membership records.
+
 All errors use `{"detail":"message"}`. Validation returns 400, missing sessions 401, invalid CSRF/admin access 403, missing or inaccessible records 404, duplicates 409, oversized uploads 413, busy password verification 429, upload storage failures 502, unavailable project-folder checks 503, and unexpected errors 500 without technical details. Protected API responses use Cache-Control: no-store.
 
 Naming and upload rules are documented in [logic-validation.md](docs/logic-validation.md). Upload payloads are limited to `MAX_UPLOAD_MB` combined, not per attachment.

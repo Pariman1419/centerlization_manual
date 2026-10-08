@@ -52,8 +52,8 @@ describe('role-based action visibility (backend remains authoritative)', () => {
   it('CONTRIBUTOR can upload and submit but not review or publish', async () => {
     expect(await manualActions('CONTRIBUTOR')).toEqual({ upload: true, submit: true, approve: false, reject: false, publish: false })
   })
-  it('REVIEWER can also approve and reject but not publish', async () => {
-    expect(await manualActions('REVIEWER')).toEqual({ upload: true, submit: true, approve: true, reject: true, publish: false })
+  it('legacy REVIEWER has the combined BA review and publish permissions', async () => {
+    expect(await manualActions('REVIEWER')).toEqual({ upload: true, submit: true, approve: true, reject: true, publish: true })
   })
   it('OWNER can do everything including publish', async () => {
     expect(await manualActions('OWNER')).toEqual({ upload: true, submit: true, approve: true, reject: true, publish: true })

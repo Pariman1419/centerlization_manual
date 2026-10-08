@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Icon } from './components/Icon'
+import { Breadcrumb } from './components/DetailNavigation'
 import { ProjectsPage } from './pages/ProjectsPage'
 import { LoginPage } from './pages/LoginPage'
 import { ManualDetailPage } from './pages/ManualDetailPage'
@@ -92,7 +93,7 @@ export function App() {
     <div className="workspace">
       <header className="workspace-header">
         <div className="mobile-brand"><Icon name="book" size={25} /><span>Manual Management</span></div>
-        <nav aria-label="Workspace breadcrumb" className="workspace-breadcrumb"><Link to="/projects">Workspace</Link><span aria-hidden="true">/</span><span aria-current="page">{currentPage}</span></nav>
+        <Breadcrumb label="Workspace breadcrumb" className="workspace-breadcrumb" items={[{ label: 'Workspace', to: '/projects' }, { label: currentPage }]} />
         <div className="header-account"><span className="avatar avatar-light">{user.display_name.slice(0, 2).toUpperCase()}</span><span>{user.display_name}</span></div>
         <button type="button" className="mobile-menu-button" aria-label={menuOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => setMenuOpen(!menuOpen)}><Icon name={menuOpen ? 'close' : 'menu'} /></button>
       </header>

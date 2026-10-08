@@ -84,13 +84,14 @@ def require_admin(user: User = Depends(get_current_user)):
     return user
 
 
-PROJECT_ROLES = ('OWNER', 'REVIEWER', 'CONTRIBUTOR', 'VIEWER', 'BA', 'DEV', 'USER')
+PROJECT_ROLES = ('ADMIN', 'OWNER', 'REVIEWER', 'CONTRIBUTOR', 'VIEWER', 'BA', 'DEV', 'USER')
+PROJECT_MANAGER_ROLES = ('OWNER', 'BA', 'REVIEWER', 'ADMIN')
 PROJECT_ROLE_LEVELS = {
     'VIEWER': 1,
     'USER': 1,
     'CONTRIBUTOR': 2,
     'DEV': 2,
-    'REVIEWER': 3,
+    'REVIEWER': 4,
     'OWNER': 4,
     'BA': 4,
     'ADMIN': 5,

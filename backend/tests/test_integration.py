@@ -51,8 +51,8 @@ def test_full_workflow_roles_isolation_and_audit(auth_users):
     assert ba02.post(f'/api/revisions/{r1}/submit-review').json()['status'] == 'IN_REVIEW'
     assert ba02.post(f'/api/revisions/{r1}/approve', json={}).status_code == 403
     assert eng.post(f'/api/revisions/{r1}/approve', json={'comment': 'ok'}).json()['status'] == 'APPROVED'
-    assert eng.post(f'/api/revisions/{r1}/publish').status_code == 403
-    assert ba01.post(f'/api/revisions/{r1}/publish').json()['status'] == 'PUBLISHED'
+    # Reviewer now shares the combined BA role, including publication.
+    assert eng.post(f'/api/revisions/{r1}/publish').json()['status'] == 'PUBLISHED'
 
     r2 = upload(ba02, manual['id'], '02').json()['id']
     assert ba02.post(f'/api/revisions/{r2}/submit-review').status_code == 200

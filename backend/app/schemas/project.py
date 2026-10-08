@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
 
-ProjectRole = Literal['OWNER', 'REVIEWER', 'CONTRIBUTOR', 'VIEWER']
+ProjectRole = Literal['ADMIN', 'OWNER', 'REVIEWER', 'CONTRIBUTOR', 'VIEWER', 'BA', 'DEV', 'USER']
 
 
 def validate_code(value):
@@ -60,6 +60,14 @@ class ProjectMemberCreate(BaseModel):
     user_id: int | None = None
     username: str | None = None
     role: ProjectRole = 'VIEWER'
+
+
+class ProjectMemberCandidate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    username: str
+    display_name: str
+    role: Literal['USER', 'ADMIN', 'BA', 'DEV']
 
 
 class ProjectMemberUpdate(BaseModel):

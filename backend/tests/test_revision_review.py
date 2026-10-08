@@ -355,7 +355,8 @@ def test_preview_and_download_regression_all_statuses(context, pdf):
             assert res.json()['url'].startswith('https://storage.example/')
 
 
-def test_project_member_role_permissions(context, pdf):
+@pytest.mark.parametrize('review_role', ['OWNER', 'BA', 'REVIEWER', 'ADMIN'])
+def test_project_member_role_permissions(context, pdf, review_role):
     client, db, _ = context
     manual_data = create_manual(client).json()
     manual = db.get(Manual, manual_data['id'])
@@ -369,7 +370,7 @@ def test_project_member_role_permissions(context, pdf):
 
     # Add project members
     db.add(ProjectMember(project_id=project.id, user_id=contributor.id, role='CONTRIBUTOR'))
-    db.add(ProjectMember(project_id=project.id, user_id=reviewer.id, role='REVIEWER'))
+    db.add(ProjectMember(project_id=project.id, user_id=reviewer.id, role=review_role))
     db.commit()
 
     # 1. Contributor uploads and submits
@@ -391,22 +392,22 @@ def test_project_member_role_permissions(context, pdf):
     pub_res = client.post(f'/api/revisions/{rev["id"]}/publish')
     assert pub_res.status_code == 403
 
-    # 2. Reviewer can approve
+    # 2. Combined BA/Reviewer and project Admin can reject, approve and publish.
+    app.dependency_overrides[get_current_user] = lambda: reviewer
+    rejected = client.post(f'/api/revisions/{rev["id"]}/reject', json={'comment': 'Please revise'})
+    assert rejected.status_code == 200
+    assert rejected.json()['status'] == 'REJECTED'
+    app.dependency_overrides[get_current_user] = lambda: contributor
+    assert client.post(f'/api/revisions/{rev["id"]}/submit-review').status_code == 200
     app.dependency_overrides[get_current_user] = lambda: reviewer
     appr_ok = client.post(f'/api/revisions/{rev["id"]}/approve', json={'comment': 'Reviewer approved'})
     assert appr_ok.status_code == 200
     assert appr_ok.json()['status'] == 'APPROVED'
 
-    # Reviewer cannot publish
+    # Combined role can also publish.
     pub_rev = client.post(f'/api/revisions/{rev["id"]}/publish')
-    assert pub_rev.status_code == 403
-
-    # 3. Owner/Admin can publish
-    admin = db.query(User).filter_by(username='BA').first()
-    app.dependency_overrides[get_current_user] = lambda: admin
-    pub_ok = client.post(f'/api/revisions/{rev["id"]}/publish')
-    assert pub_ok.status_code == 200
-    assert pub_ok.json()['status'] == 'PUBLISHED'
+    assert pub_rev.status_code == 200
+    assert pub_rev.json()['status'] == 'PUBLISHED'
 
 
 def _count_audit(db, action):
@@ -569,12 +570,12 @@ def test_withdraw_returns_to_draft(context, pdf):
     assert client.post(f'/api/revisions/{rev["id"]}/submit-review').status_code == 200
 
 
-def test_reviewer_cannot_withdraw(context, pdf):
+def test_combined_ba_reviewer_can_withdraw(context, pdf):
     client, db, _ = context
     manual = create_manual(client).json()
     rev = upload(client, manual['id'], pdf).json()
     client.post(f'/api/revisions/{rev["id"]}/submit-review')
     reviewer = _member(db, manual['project_id'], 'rev3', 'REVIEWER')
     app.dependency_overrides[get_current_user] = lambda: reviewer
-    assert client.post(f'/api/revisions/{rev["id"]}/withdraw').status_code == 403
-    assert db.get(ManualRevision, rev['id']).status == 'IN_REVIEW'
+    assert client.post(f'/api/revisions/{rev["id"]}/withdraw').status_code == 200
+    assert db.get(ManualRevision, rev['id']).status == 'DRAFT'

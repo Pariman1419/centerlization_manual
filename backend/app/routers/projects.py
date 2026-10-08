@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from pydantic import TypeAdapter, ValidationError
 
-from app.auth import accessible_project, get_current_user
+from app.auth import PROJECT_MANAGER_ROLES, accessible_project, get_current_user
 from app.database import get_db
 from app.models.manual import Manual, utcnow
 from app.models.manual_revision import ManualRevision
@@ -22,6 +22,7 @@ from app.services import redis_cache
 from app.schemas.manual import ManualCreate, ManualRead
 from app.schemas.project import (
     ProjectCreate,
+    ProjectMemberCandidate,
     ProjectMemberCreate,
     ProjectMemberRead,
     ProjectMemberUpdate,
@@ -35,7 +36,7 @@ manual_list_adapter = TypeAdapter(list[ManualRead])
 
 
 def lock_project(db, project_id):
-    # Serialize member changes so concurrent demote/remove cannot leave a Project without an OWNER.
+    # Serialize member changes so demote/remove cannot leave a Project without a manager.
     db.scalar(select(Project.id).where(Project.id == project_id).with_for_update())
 
 
@@ -232,6 +233,15 @@ def list_project_members(project_id: int, db: Session = Depends(get_db), user: U
     ).all()
 
 
+@router.get('/{project_id}/member-candidates', response_model=list[ProjectMemberCandidate])
+def list_member_candidates(project_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    accessible_project(db, project_id, user, min_role='OWNER')
+    member_ids = select(ProjectMember.user_id).where(ProjectMember.project_id == project_id)
+    return db.scalars(
+        select(User).where(User.is_active.is_(True), User.id.not_in(member_ids)).order_by(User.username)
+    ).all()
+
+
 @router.post('/{project_id}/members', response_model=ProjectMemberRead, status_code=201)
 def add_project_member(project_id: int, payload: ProjectMemberCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     project = accessible_project(db, project_id, user, min_role='OWNER')
@@ -286,11 +296,11 @@ def update_project_member(project_id: int, user_id: int, payload: ProjectMemberU
     if member is None:
         raise HTTPException(404, 'Member not found')
 
-    if member.role == 'OWNER' and payload.role != 'OWNER':
+    if member.role in PROJECT_MANAGER_ROLES and payload.role not in PROJECT_MANAGER_ROLES:
         owner_count = db.scalar(
             select(func.count(ProjectMember.id)).where(
                 ProjectMember.project_id == project.id,
-                ProjectMember.role == 'OWNER'
+                ProjectMember.role.in_(PROJECT_MANAGER_ROLES)
             )
         )
         if owner_count <= 1:
@@ -320,11 +330,11 @@ def remove_project_member(project_id: int, user_id: int, db: Session = Depends(g
     if member is None:
         raise HTTPException(404, 'Member not found')
 
-    if member.role == 'OWNER':
+    if member.role in PROJECT_MANAGER_ROLES:
         owner_count = db.scalar(
             select(func.count(ProjectMember.id)).where(
                 ProjectMember.project_id == project.id,
-                ProjectMember.role == 'OWNER'
+                ProjectMember.role.in_(PROJECT_MANAGER_ROLES)
             )
         )
         if owner_count <= 1:

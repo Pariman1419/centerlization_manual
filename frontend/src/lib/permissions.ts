@@ -7,7 +7,7 @@ const LEVEL: Record<string, number> = {
   USER: 1,
   CONTRIBUTOR: 2,
   DEV: 2,
-  REVIEWER: 3,
+  REVIEWER: 4,
   OWNER: 4,
   BA: 4,
   ADMIN: 5,
