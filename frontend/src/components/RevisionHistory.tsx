@@ -19,6 +19,7 @@ interface RevisionHistoryProps {
   onDevReview?: (revision: Revision) => void
   onReupload?: (revision: Revision) => void
   onWithdraw?: (revision: Revision) => void
+  canWithdraw?: (revision: Revision) => boolean
 }
 
 export function RevisionHistory({
@@ -33,6 +34,7 @@ export function RevisionHistory({
   canManage,
   onEdit,
   onWithdraw,
+  canWithdraw,
   onUpdate,
   onRequestDevReview,
   onDevReview,
@@ -120,7 +122,7 @@ export function RevisionHistory({
                         Edit
                       </button>
                     )}
-                    {revision.status === 'IN_REVIEW' && onWithdraw && canManage?.(revision) && (
+                    {revision.status === 'IN_REVIEW' && onWithdraw && (canWithdraw ? canWithdraw(revision) : canManage?.(revision)) && (
                       <button className="btn-secondary btn-small" aria-label={`Withdraw REV ${revision.revision_no} from review`} onClick={() => onWithdraw(revision)}>
                         Withdraw
                       </button>

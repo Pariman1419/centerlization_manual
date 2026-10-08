@@ -384,6 +384,7 @@ export function ManualDetailPage({ currentUsername }: { currentUsername?: string
             }}
             canDelete={rev => atLeast(role, 'OWNER') || (atLeast(role, 'CONTRIBUTOR') && rev.uploaded_by === currentUsername)}
             canManage={rev => atLeast(role, 'OWNER') || (atLeast(role, 'CONTRIBUTOR') && (rev.uploaded_by === currentUsername || rev.submitted_by === currentUsername))}
+            canWithdraw={rev => rev.submitted_by === currentUsername}
             onEdit={!atLeast(role, 'CONTRIBUTOR') ? undefined : rev => {
               setEditRevision(rev)
               setEditDetail(rev.revision_detail ?? '')
