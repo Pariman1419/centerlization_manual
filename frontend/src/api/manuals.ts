@@ -1,16 +1,17 @@
-import type { Manual, ManualInput, Revision, RevisionReview, RevisionUpdateEvent } from '../types/manual'
+import type { Manual, ManualInput, ReviewQueueData, Revision, RevisionReview, RevisionUpdateEvent } from '../types/manual'
 
 let csrfToken = ''
 let requestGeneration = 0
 const pendingReads = new Map<string, Promise<unknown>>()
 function clearReadCache() { requestGeneration++; pendingReads.clear() }
+function finishMutation() { clearReadCache(); window.dispatchEvent(new Event('manual-data-changed')) }
 export function setCsrfToken(value: string) { csrfToken = value; clearReadCache() }
 
 export function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const mutation = !['GET', 'HEAD', 'OPTIONS'].includes((options.method ?? 'GET').toUpperCase())
   if (mutation) {
     clearReadCache()
-    return fetchRequest<T>(path, options).finally(clearReadCache)
+    return fetchRequest<T>(path, options).finally(finishMutation)
   }
   // ponytail: share in-flight metadata reads only; add TTL only with cross-user invalidation.
   const cacheable = Object.keys(options).length === 0 && /^\/(projects|manuals)(\/\d+)?(\/manuals|\/revisions)?$/.test(path)
@@ -34,7 +35,8 @@ async function fetchRequest<T>(path: string, options: RequestInit): Promise<T> {
   }
   try {
     response = await fetch(`/api${path}`, { ...options, headers, credentials: 'same-origin' })
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error
     throw new Error('Unable to reach Manual Management. Check your connection and try again.')
   }
   const body = await response.json().catch(() => null)
@@ -49,6 +51,8 @@ async function fetchRequest<T>(path: string, options: RequestInit): Promise<T> {
 
 export const manualsApi = {
   list: () => request<Manual[]>('/manuals'),
+  search: (search: string, signal?: AbortSignal) => request<Manual[]>(`/manuals?${new URLSearchParams({ search, limit: '20' })}`, { signal }),
+  reviewQueue: (signal?: AbortSignal) => request<ReviewQueueData>('/manuals/review-queue', { signal }),
   get: (id: number) => request<Manual>(`/manuals/${id}`),
   create: (input: ManualInput, projectId?: number) => request<Manual>(projectId === undefined ? '/manuals' : `/projects/${projectId}/manuals`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),

@@ -39,3 +39,21 @@ class ManualRead(BaseModel):
     created_by: str
     created_at: datetime
     updated_at: datetime
+
+
+class ReviewQueueItem(BaseModel):
+    revision_id: int
+    manual_id: int
+    manual_code: str
+    title: str
+    project_id: int
+    project_code: str
+    project_name: str
+    revision_no: str
+    submitted_at: datetime | None
+
+
+class ReviewQueueRead(BaseModel):
+    can_review: bool
+    count: int
+    items: list[ReviewQueueItem]

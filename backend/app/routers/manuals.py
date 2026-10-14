@@ -5,21 +5,23 @@ import os
 import re
 import zipfile
 from uuid import uuid4
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pypdf import PdfReader
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.auth import accessible_project, get_current_user
+from app.auth import PROJECT_MANAGER_ROLES, accessible_project, get_current_user
 from app.database import get_db
 from app.models.manual import Manual, utcnow
 from app.models.manual_revision import ManualRevision, RevisionFile
 from app.models.project import Project
+from app.models.project_member import ProjectMember
 from app.models.user import User
-from app.schemas.manual import ManualCreate, ManualRead, ManualUpdate
+from app.schemas.manual import ManualCreate, ManualRead, ManualUpdate, ReviewQueueRead
 from app.schemas.manual_revision import RevisionRead
 from app.services.audit import AuditAction, write_audit_event
 from app.services.minio_service import get_storage
@@ -39,7 +41,8 @@ def require_manual(db, manual_id, user, min_role: str = 'VIEWER'):
 
 @router.get('', response_model=list[ManualRead])
 def list_manuals(search: str = '', category: str | None = None, status: str | None = None,
-                 project_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+                 project_id: int | None = None, limit: Annotated[int | None, Query(ge=1, le=100)] = None,
+                 db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     query = select(Manual)
     if user.role != 'ADMIN':
         from app.models.project_member import ProjectMember
@@ -56,7 +59,32 @@ def list_manuals(search: str = '', category: str | None = None, status: str | No
         query = query.where(Manual.status == status)
     if project_id is not None:
         query = query.where(Manual.project_id == project_id)
-    return db.scalars(query.order_by(Manual.updated_at.desc(), Manual.id.desc())).all()
+    query = query.order_by(Manual.updated_at.desc(), Manual.id.desc())
+    if limit is not None:
+        query = query.limit(limit)
+    return db.scalars(query).all()
+
+
+@router.get('/review-queue', response_model=ReviewQueueRead)
+def review_queue(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Count and preview pending BA work using current membership, never cached permissions."""
+    eligible_projects = select(ProjectMember.project_id).where(
+        ProjectMember.user_id == user.id, ProjectMember.role.in_(PROJECT_MANAGER_ROLES))
+    if user.role != 'ADMIN' and not db.scalar(select(eligible_projects.exists())):
+        return {'can_review': False, 'count': 0, 'items': []}
+    query = select(
+        ManualRevision.id.label('revision_id'), Manual.id.label('manual_id'), Manual.manual_code,
+        Manual.title, Project.id.label('project_id'), Project.project_code, Project.project_name,
+        ManualRevision.revision_no, ManualRevision.submitted_at,
+    ).join(Manual, Manual.id == ManualRevision.manual_id).join(Project, Project.id == Manual.project_id
+    ).where(ManualRevision.status == 'IN_REVIEW')
+    if user.role != 'ADMIN':
+        query = query.where(Project.id.in_(eligible_projects))
+    count = db.scalar(select(func.count()).select_from(query.subquery()))
+    items = db.execute(query.order_by(
+        func.coalesce(ManualRevision.submitted_at, ManualRevision.uploaded_at), ManualRevision.id
+    ).limit(20)).mappings().all()
+    return {'can_review': True, 'count': count, 'items': items}
 
 
 @router.post('', response_model=ManualRead, status_code=201)

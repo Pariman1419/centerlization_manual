@@ -11,6 +11,8 @@ import { WorkflowGuidePage } from './pages/WorkflowGuidePage'
 import { authApi } from './api/auth'
 import { errorMessage } from './api/manuals'
 import type { User } from './types/user'
+import { GlobalSearch } from './components/GlobalSearch'
+import { ReviewQueue } from './components/ReviewQueue'
 
 const UsersPage = lazy(() => import('./pages/UsersPage').then(m => ({ default: m.UsersPage })))
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage').then(m => ({ default: m.ChangePasswordPage })))
@@ -84,6 +86,7 @@ export function App() {
           </NavLink>
         )}
       </nav>
+      <ReviewQueue />
       <div className="sidebar-bottom">
         <div className="sidebar-account"><span className="avatar">{user.display_name.slice(0, 2).toUpperCase()}</span><div className="min-w-0"><p className="font-semibold break-words">{user.display_name}</p><p className="sidebar-caption">{user.role === 'ADMIN' ? 'Administrator' : 'Workspace member'}</p></div></div>
         <Link to="/change-password" className="sidebar-link"><Icon name="lock" /><span>Change password</span></Link>
@@ -94,10 +97,12 @@ export function App() {
       <header className="workspace-header">
         <div className="mobile-brand"><Icon name="book" size={25} /><span>Manual Management</span></div>
         <Breadcrumb label="Workspace breadcrumb" className="workspace-breadcrumb" items={[{ label: 'Workspace', to: '/projects' }, { label: currentPage }]} />
+        <GlobalSearch />
         <div className="header-account"><span className="avatar avatar-light">{user.display_name.slice(0, 2).toUpperCase()}</span><span>{user.display_name}</span></div>
         <button type="button" className="mobile-menu-button" aria-label={menuOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => setMenuOpen(!menuOpen)}><Icon name={menuOpen ? 'close' : 'menu'} /></button>
       </header>
       {menuOpen && <nav id="mobile-navigation" className="mobile-navigation" aria-label="Mobile navigation">
+        <ReviewQueue onNavigate={() => setMenuOpen(false)} />
         <NavLink to="/projects"><Icon name="folder" />Projects</NavLink>
         <NavLink to="/templates"><Icon name="template" />Templates</NavLink>
         <NavLink to="/guidelines"><Icon name="guide" />Guidelines</NavLink>

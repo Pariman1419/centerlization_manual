@@ -83,3 +83,19 @@ export interface ManualInput {
   category: string
   description: string
 }
+
+export interface ReviewQueueData {
+  can_review: boolean
+  count: number
+  items: {
+    revision_id: number
+    manual_id: number
+    manual_code: string
+    title: string
+    project_id: number
+    project_code: string
+    project_name: string
+    revision_no: string
+    submitted_at: string | null
+  }[]
+}

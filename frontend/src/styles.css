@@ -116,6 +116,21 @@
 .avatar-light { background: #e6edf5; color: #29496b; }
 .workspace { margin-left: 244px; min-width: 0; }
 .workspace-header { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 36px; background: rgb(255 255 255 / 96%); border-bottom: 1px solid var(--edge); }
+.global-search { position: relative; flex: 1 1 300px; max-width: 520px; min-width: 0; }
+.global-search form { display: flex; align-items: center; gap: 8px; }
+.global-search input { min-width: 0; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border-control); border-radius: 8px; background: white; font-size: 14px; }
+.global-search input:focus-visible { outline: 3px solid #9bc1e5; outline-offset: 2px; }
+.search-results { position: absolute; top: calc(100% + 8px); right: 0; width: min(520px, 100%); padding: 18px; z-index: 30; max-height: 65vh; overflow-y: auto; }
+.search-results-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.search-results li + li, .review-queue-list li + li { border-top: 1px solid var(--edge); }
+.search-results li a, .review-queue-list li a { display: flex; flex-direction: column; gap: 5px; padding: 12px 4px; overflow-wrap: anywhere; }
+.search-results li a:hover, .review-queue-list li a:hover { background: var(--canvas); }
+.review-queue-button { width: 100%; margin-top: 10px; gap: 8px; font-size: 13px; }
+.review-count { margin-left: auto; min-width: 24px; padding: 3px 6px; border-radius: 6px; color: #183153; background: #dbeafe; font-size: 12px; }
+.review-queue-dialog { width: min(640px, calc(100vw - 32px)); }
+@media (min-width: 768px) and (max-width: 1100px) { .header-account > span:last-child { display: none; } .workspace-header { gap: 12px; } }
+@media (min-width: 768px) and (max-width: 1023px) { .review-queue-button { flex-wrap: wrap; } .review-count { margin-left: 0; } }
+@media (max-width: 767px) { .workspace-header { flex-wrap: wrap; gap: 12px; } .global-search { order: 3; flex-basis: 100%; max-width: none; } .mobile-navigation .review-queue-button { color: var(--navy); margin-top: 0; } .search-results { width: 100%; } }
 .breadcrumb { min-width: 0; font-size: 14px; color: var(--muted); }
 .breadcrumb ol { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .breadcrumb li { display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; }
