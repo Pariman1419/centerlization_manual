@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "checks": [
+    "Login and role-scoped queue count",
+    "Responsive workspace 1280px; no horizontal overflow",
+    "Responsive workspace 768px; no horizontal overflow",
+    "Responsive workspace 375px; no horizontal overflow",
+    "Mobile review queue opens an actionable document",
+    "Cross-project search and keyboard-focus restoration",
+    "Real 4 MB PDF selection, multipart upload, progress, processing and saved revision",
+    "Cancel preserves input/files and checks revision history inside the form",
+    "File-type confirmation, dirty-close guard and Escape guard",
+    "Review count refreshes after workflow mutation without reload",
+    "No uncaught page errors or HTTP 5xx responses"
+  ],
+  "pageErrors": [],
+  "serverErrors": []
+}

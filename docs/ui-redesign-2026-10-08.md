@@ -11,4 +11,4 @@ Implemented the approved navy and ivory concept in the existing React frontend.
 
 The 3D visual treatment uses rendered artwork and CSS depth. It does not require a WebGL scene or additional runtime dependencies.
 
-Tests, type checking, builds and browser validation were deliberately not run, as requested by the user. Runtime and visual validation remain pending.
+At the original redesign handoff, tests, type checking, builds and browser validation were deliberately not run, as requested by the user. That was a historical status. Subsequent work established a tested baseline; current test/build and isolated Chromium upload/responsive results are recorded in [the 14 October verification report](verification-2026-10-14.md).

@@ -1,5 +1,7 @@
 # Login and Project ownership — implementation report
 
+Historical report from 7 October. Later membership, password-management and workflow changes supersede the limitations below. Current source/test/browser results are in [14 October verification](verification-2026-10-14.md).
+
 Verified 7 October 2026. Updated the existing application in response to the user's request: remove All Manuals, add Login/user storage, show each user only Projects they create, let admin see all, and delete the old test fixtures.
 
 ## Result and usage

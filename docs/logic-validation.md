@@ -46,11 +46,13 @@ after locking, combined upload limits, and retention of form values and old file
 Backend business tests use SQLite and in-memory storage. PostgreSQL row-lock
 behavior and a live MinIO deployment require separate integration verification.
 
-Verification on 2026-10-08: 48 targeted backend tests and 44 frontend tests pass;
+Historical verification on 2026-10-08: 48 targeted backend tests and 44 frontend tests pass;
 the frontend production build passes. The full backend suite reports 133 passed
 and one existing failure, `test_all_reserved_actions_are_defined`, which expects
 17 audit actions while the unchanged action registry contains 18. Starlette also
 reports an existing deprecation warning about the test client's use of httpx.
+
+The action-count failure above is no longer present in the current suite. See [14 October verification](verification-2026-10-14.md): 182 backend and 87 frontend tests pass, along with build and isolated browser checks. PostgreSQL row-lock/storage integration and Redis production performance are separate from the isolated browser environment.
 
 ## Optimization and cache
 

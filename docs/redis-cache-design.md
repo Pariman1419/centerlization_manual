@@ -145,4 +145,6 @@ expects 17 while the registry contains 18. Independent review found one importan
 deeply nested JSON fallback issue, fixed with a regression test; the conservative
 savepoint invalidation noted above is an accepted performance tradeoff.
 
+The verification counts/action-count mismatch above describe the 8 October implementation run. The current suite passes; see [14 October verification](verification-2026-10-14.md). Production p95 latency and Redis cache hit rates remain unmeasured; the new queue's read-only SQL plan checks do not measure cache performance.
+
 Reference: https://redis.io/docs/latest/develop/use-cases/cache-aside/

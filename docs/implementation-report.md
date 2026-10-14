@@ -1,5 +1,7 @@
 # Manual Management implementation report
 
+Historical report from 7 October. Later authentication, workflow and deployment changes supersede the remaining-scope notes below. Current checks are in [14 October verification](verification-2026-10-14.md).
+
 Verified 7 October 2026. Running locally at http://127.0.0.1:5173/manuals; API at http://127.0.0.1:8000.
 
 ## 1. Files created

@@ -63,3 +63,11 @@ Project-role isolation; bounded queries without ORM relationship fan-out; cancel
 Ruling: Execute inline in a temporary linked worktree and integrate after validation; the user requested completion and push, so routine implementation choices and final publication are already authorized.
 
 Ruling: Keep Fitness/Djuwara and completed Phase A-D work as implemented. Complete only the outstanding items named in the preceding status report.
+
+Task 1 complete: `83af1dd`; 37 navigation/manual/project backend tests and four new frontend navigation tests passed. Annotated Query metadata keeps the direct project-list function call's default limit as None.
+
+Task 2 complete: `4eb3102`; upload/workflow/BA-update checks passed. Slow parent refresh reproduction proved the modal must retain its mount and file state.
+
+Final review: independent read-only review found one Important cancellation-reconciliation gap and one focus-dismissal issue. Reproducing tests failed before fixing both. Cancellation now awaits an in-dialog history check, blocks retries on failed/committed/version-changed outcomes and preserves the original expected_version. Focus returns to the search input.
+
+Task 3 verification: 87 frontend tests and build passed; isolated Chromium passed real PDF upload/cancel, queue/search, dirty/type/Escape guards and three viewport checks with zero uncaught page errors/5xx. Read-only PostgreSQL plans checked generated queue queries. React Doctor reports six warnings (complexity and explicit loading transitions), documented in the dated report.

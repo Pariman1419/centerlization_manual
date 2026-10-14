@@ -101,6 +101,7 @@ Naming and upload rules are documented in [logic-validation.md](docs/logic-valid
 | GET | `/api/projects/{id}/manuals` | Project-scoped list; optional `search`, `category`, `status` |
 | POST | `/api/projects/{id}/manuals` | Create manual in the URL project using existing validation |
 | GET | `/api/manuals` | List; optional `search`, `category`, `status`, `project_id` |
+| GET | `/api/manuals/review-queue` | Current role-scoped IN_REVIEW count and oldest 20 items; system Admin or project ADMIN/OWNER/BA/REVIEWER |
 | POST | `/api/manuals` | Create draft inside an accessible project; admin-only LEGACY fallback when project_id omitted |
 | GET | `/api/manuals/{id}` | Metadata with current revision |
 | GET | `/api/manuals/{id}/revisions` | History, newest upload first |
@@ -158,9 +159,17 @@ npm.cmd run build
 npm.cmd audit
 ```
 
-Current verification: **50 backend tests and 20 frontend tests passed**, TypeScript/build PASS and zero npm audit vulnerabilities. Tests use isolated SQLite and memory storage; new auth tests exercise real password/session/CSRF behavior. Live smoke passed with PostgreSQL, real HTTP and MinIO for two separate users, administrator visibility, every descendant access check, upload/preview/download/publish/current-pointer behavior, and scoped fixture cleanup. Browser admin Login/Users/form/Logout passed. Full browser PDF selection retains the previously documented extension file-access limitation.
+Current verification (14 October 2026): **182 backend tests and 87 frontend tests passed**, TypeScript/build passed. Isolated Chromium checks passed for real 4 MB PDF file selection/upload, byte progress, cancellation/history reconciliation, unsaved-change guards, global search, review-count refresh and 375/768/1280 px layouts. See [the dated verification report](docs/verification-2026-10-14.md) for evidence, the existing dependency warning, query plans and the distinction between isolated checks and deployment integration.
 
-The old Phase 1/2 fixtures were removed at the user's request. `docs/implementation-report.md`, `docs/project-management-report.md`, `scripts/smoke.py` and `scripts/smoke_projects.py` describe those historical checks. Use the current `scripts/smoke_auth.py` verification. See `docs/authentication-report.md` for the latest files, schema, test results and login instructions.
+The old Phase 1/2 fixtures were removed at the user's request. `docs/implementation-report.md`, `docs/project-management-report.md`, `docs/authentication-report.md`, `scripts/smoke.py` and `scripts/smoke_projects.py` describe historical checks. `scripts/smoke_auth.py` is the separate live PostgreSQL/MinIO integration check; its scoped temporary fixtures are described in the authentication report.
+
+## Search, review queue and safer uploads
+
+The header searches accessible document codes/titles across projects, displaying at most 20 matches. `GET /api/manuals` accepts an optional `limit` from 1 to 100; omitting it preserves the existing list behavior. Search treats wildcard characters as literal text.
+
+Waiting for review appears for users with review permissions, opens an actionable queue, and refreshes after changes or when returning to the browser. Permissions are checked fresh on the server.
+
+Revision uploads and BA replacements show transmitted-byte progress and a separate saving state. Cancel upload retains inputs/files and checks revision history before allowing a retry. If history already contains the new REV or the BA revision changed, inspect/reopen it before sending another update. Browser cancellation cannot undo a completed server save. Edited forms ask before discarding changes, and file-type changes ask before clearing selections.
 
 ## BA Update/Edit workflow
 

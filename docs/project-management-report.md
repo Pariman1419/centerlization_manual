@@ -1,5 +1,7 @@
 # Manual Management — Project Management implementation report
 
+Historical report from 7 October. Authentication/roles and later workflow changes supersede the scope notes below. Current isolated browser upload/responsive checks are in [14 October verification](verification-2026-10-14.md).
+
 Verified 7 October 2026. Incremental enhancement of the existing application; no rebuild or architecture replacement.
 
 ## 1. Inspection findings
