@@ -11,6 +11,7 @@ export function GlobalSearch() {
   const [error, setError] = useState('')
   const controller = useRef<AbortController | null>(null)
   const generation = useRef(0)
+  const input = useRef<HTMLInputElement>(null)
   const resultsId = useId()
 
   useEffect(() => () => { generation.current++; controller.current?.abort() }, [])
@@ -19,6 +20,7 @@ export function GlobalSearch() {
     controller.current?.abort()
     setResults(null); setError(''); setBusy(false)
   }
+  function dismissResults() { clearResults(); input.current?.focus() }
   async function search(event: FormEvent) {
     event.preventDefault()
     clearResults()
@@ -38,16 +40,16 @@ export function GlobalSearch() {
     }
   }
   return <div className="global-search" onKeyDown={event => {
-    if (event.key === 'Escape') { event.stopPropagation(); clearResults() }
+    if (event.key === 'Escape') { event.stopPropagation(); dismissResults() }
   }}>
     <form role="search" onSubmit={search}>
-      <input type="search" aria-label="Search all documents" placeholder="Search document code or title"
+      <input ref={input} type="search" aria-label="Search all documents" placeholder="Search document code or title"
         maxLength={255} aria-controls={resultsId} value={query}
         onChange={event => { clearResults(); setQuery(event.target.value) }} />
-      <button className="btn-secondary" aria-label="Search documents" disabled={busy || !query.trim()}>Search</button>
+      <button type="submit" className="btn-secondary" aria-label="Search documents" disabled={busy || !query.trim()}>Search</button>
     </form>
     {(busy || error || results !== null) && <section id={resultsId} className="search-results panel" aria-label="Document search results" aria-busy={busy}>
-      <div className="search-results-heading"><strong>Document search</strong><button className="btn-secondary btn-small" onClick={clearResults}>Close results</button></div>
+      <div className="search-results-heading"><strong>Document search</strong><button type="button" className="btn-secondary btn-small" onClick={dismissResults}>Close results</button></div>
       {busy && <p role="status">Searching documents…</p>}
       {error && <p role="alert" className="error">{error} Submit the search again to retry.</p>}
       {results?.length === 0 && <p>No matching documents in your projects.</p>}

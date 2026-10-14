@@ -123,12 +123,9 @@ export function ManualDetailPage({ currentUsername }: { currentUsername?: string
 
   async function refreshCancelledUpload() {
     const generation = viewGeneration.current
-    try {
-      const history = await manualsApi.revisions(manualId)
-      if (generation === viewGeneration.current) setRevisions(history)
-    } catch {
-      if (generation === viewGeneration.current) setMessage('Revision history could not be refreshed. Check your connection and refresh before retrying.')
-    }
+    const history = await manualsApi.revisions(manualId)
+    if (generation === viewGeneration.current) setRevisions(history)
+    return history
   }
 
   async function handleSaveRevision() {

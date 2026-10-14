@@ -43,7 +43,7 @@ export function ReviewQueue({ onNavigate }: { onNavigate?: () => void }) {
     <button className="sidebar-link review-queue-button" aria-label={error ? 'Review queue unavailable' : `Waiting for review: ${queue?.count ?? 0}`}
       onClick={() => { setOpen(true); setReload(value => value + 1) }}>
       <Icon name="guide" /><span>Waiting for review</span>
-      <strong role="status" className="review-count" aria-label={error ? 'Review queue unavailable' : `${queue?.count ?? 0} documents waiting for review`}>{error ? '!' : queue?.count}</strong>
+      <strong role={error ? undefined : 'status'} className="review-count" aria-label={error ? 'Review queue unavailable' : `${queue?.count ?? 0} documents waiting for review`}>{error ? '!' : queue?.count}</strong>
     </button>
     {open && <Dialog title="Waiting for review" onClose={() => setOpen(false)} className="review-queue-dialog">
       <div className="p-6">

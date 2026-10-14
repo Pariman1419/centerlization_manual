@@ -29,7 +29,7 @@ function FileRow({ file, onRemove }: { file: File; onRemove: () => void }) {
 }
 
 export function UploadRevisionModal({ manual, revision, onUploaded, onClose, onCancelled }: {
-  manual: Manual; revision?: Revision; onUploaded: (revision: Revision) => void; onClose: () => void; onCancelled?: () => void
+  manual: Manual; revision?: Revision; onUploaded: (revision: Revision) => void; onClose: () => void; onCancelled?: () => Promise<Revision[]>
 }) {
   const [type, setType] = useState<FileType>('PDF')
   const [files, setFiles] = useState<File[]>([])
@@ -42,6 +42,7 @@ export function UploadRevisionModal({ manual, revision, onUploaded, onClose, onC
   const [progress, setProgress] = useState<number | null>(0)
   const [discarding, setDiscarding] = useState(false)
   const [nextType, setNextType] = useState<FileType | null>(null)
+  const [cancelCheck, setCancelCheck] = useState<'checking' | 'failed' | 'clear' | 'blocked' | null>(null)
   const controller = useRef<AbortController | null>(null)
   const mounted = useRef(true)
   const dirty = files.length > 0 || revisionNumber.length > 0 || detail !== (revision?.revision_detail ?? '') || otherType.length > 0
@@ -56,12 +57,46 @@ export function UploadRevisionModal({ manual, revision, onUploaded, onClose, onC
     return () => window.removeEventListener('beforeunload', warn)
   }, [dirty, busy])
 
-  function close() { if (busy) return; if (dirty) setDiscarding(true); else onClose() }
+  function close() { if (busy || cancelCheck === 'checking') return; if (dirty) setDiscarding(true); else onClose() }
   function applyType(next: FileType) { setType(next); setFiles([]); setError(''); setNextType(null) }
   function changeType(next: FileType) {
     if (next === type) return
     if (files.length) setNextType(next)
     else applyType(next)
+  }
+  async function reconcileCancellation() {
+    setCancelCheck('checking')
+    setError('Upload cancelled on this device. The server may already have saved the revision. Refresh revision history before retrying. Checking history…')
+    try {
+      const history = await (onCancelled ? onCancelled() : manualsApi.revisions(manual.id))
+      if (!mounted.current) return
+      if (revision) {
+        const current = history.find(item => item.id === revision.id)
+        if (!current || (current.content_version ?? 0) !== (revision.content_version ?? 0) || current.status !== revision.status) {
+          setCancelCheck('blocked')
+          setError('This revision changed or was removed while the upload was in progress. Close this form and inspect the latest revision before making another update. Your selected files are still here.')
+          return
+        }
+      } else {
+        const number = revisionNumber.trim()
+        const normalized = /^\d+$/.test(number) ? number.replace(/^0+/, '') || '0' : number
+        const exists = history.some(item => {
+          const value = item.revision_no
+          return (/^\d+$/.test(value) ? value.replace(/^0+/, '') || '0' : value) === normalized
+        })
+        if (exists) {
+          setCancelCheck('blocked')
+          setError(`REV ${number} already exists in revision history. Close this form and inspect it before uploading again. Your selected files are still here.`)
+          return
+        }
+      }
+      setCancelCheck('clear')
+      setError('Upload cancelled. Revision history was refreshed; no completed upload was found yet. The server may still finish processing. Check history before retrying; your details and selected files have been kept.')
+    } catch {
+      if (!mounted.current) return
+      setCancelCheck('failed')
+      setError('Could not refresh revision history. Check your connection and retry the history check before sending files again. Your details and selected files have been kept.')
+    }
   }
 
   function validate(file: File): string {
@@ -90,7 +125,7 @@ export function UploadRevisionModal({ manual, revision, onUploaded, onClose, onC
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (busy || discarding || nextType) return
+    if (busy || discarding || nextType || (cancelCheck !== null && cancelCheck !== 'clear')) return
     if (!revision && files.length === 0) { setError('Select a file to upload.'); return }
     const form = new FormData(event.currentTarget)
     const data = new FormData()
@@ -108,7 +143,7 @@ export function UploadRevisionModal({ manual, revision, onUploaded, onClose, onC
     }
     const request = new AbortController()
     controller.current = request
-    setBusy(true); setError(''); setProgress(0)
+    setBusy(true); setError(''); setProgress(0); setCancelCheck(null)
     const options = { signal: request.signal, onProgress: (percent: number | null) => { if (mounted.current) setProgress(percent) } }
     try {
       const saved = await (revision ? manualsApi.replaceFiles(revision.id, data, options) : manualsApi.upload(manual.id, data, options))
@@ -116,17 +151,17 @@ export function UploadRevisionModal({ manual, revision, onUploaded, onClose, onC
     } catch (err) {
       if (!mounted.current) return
       if (request.signal.aborted) {
-        setError('Upload cancelled on this device. The server may already have saved the revision. Refresh revision history before retrying.')
-        onCancelled?.()
+        setBusy(false)
+        await reconcileCancellation()
       } else setError(errorMessage(err))
     } finally {
       controller.current = null
       if (mounted.current) setBusy(false)
     }
   }
-  return <Dialog title={revision ? `Update REV ${revision.revision_no}` : "Upload New Revision"} onClose={close} busy={busy}>
+  return <Dialog title={revision ? `Update REV ${revision.revision_no}` : "Upload New Revision"} onClose={close} busy={busy || cancelCheck === 'checking'}>
     <form onSubmit={submit}>
-      <fieldset disabled={busy || discarding || nextType !== null} className="space-y-5 px-6 py-5">
+      <fieldset disabled={busy || cancelCheck === 'checking' || discarding || nextType !== null} className="space-y-5 px-6 py-5">
         <div className="rounded-md bg-slate-50 p-3 text-sm">
           <p className="mb-2 text-slate-500">Project: {manual.project_name}</p>
           <p className="font-medium text-slate-800">{manual.title}</p>
@@ -166,24 +201,30 @@ export function UploadRevisionModal({ manual, revision, onUploaded, onClose, onC
         <p className="text-xs text-slate-500">Updates and uploads are saved as drafts. BA approves the latest files before publishing.</p>
         {error && <p role="alert" className="error">{error}</p>}
       </fieldset>
+      {cancelCheck && <div className="px-6 pb-5">
+        {cancelCheck === 'checking' ? <p role="status">Checking revision history…</p> : <>
+          <button type="button" className="btn-secondary btn-small" onClick={reconcileCancellation}>Refresh revision history</button>
+          {cancelCheck === 'blocked' && <button type="button" className="btn-secondary btn-small ml-2" onClick={close}>Close and inspect history</button>}
+        </>}
+      </div>}
       {busy && <div className="px-6 pb-5" aria-live="polite">
         <progress aria-label="File upload" max={100} value={progress ?? undefined} className="upload-progress" />
         <p className="mt-2 text-sm text-slate-600">{progress === 100 ? 'Files sent; waiting for the server to save the revision…' : progress === null ? 'Sending files…' : `Sending files: ${progress}%`}</p>
       </div>}
-      {discarding && <section role="alertdialog" aria-label="Discard unsaved changes" className="upload-confirmation">
+      {discarding && <section aria-live="assertive" aria-label="Discard unsaved changes" className="upload-confirmation">
         <p className="font-semibold">Discard unsaved changes?</p><p>Revision details and selected files will be cleared.</p>
         <div><button type="button" className="btn-secondary" autoFocus onClick={() => setDiscarding(false)}>Keep editing</button>
           <button type="button" className="btn-danger" onClick={onClose}>Discard changes</button></div>
       </section>}
-      {nextType && <section role="alertdialog" aria-label="Change file type" className="upload-confirmation">
+      {nextType && <section aria-live="assertive" aria-label="Change file type" className="upload-confirmation">
         <p className="font-semibold">Changing the file type clears the selected files.</p>
         <div><button type="button" className="btn-secondary" autoFocus onClick={() => setNextType(null)}>Keep files</button>
           <button type="button" className="btn-danger" onClick={() => applyType(nextType)}>Change type and clear files</button></div>
       </section>}
       <div className="modal-footer">
         {busy ? <button type="button" className="btn-secondary" onClick={() => controller.current?.abort()}>Cancel upload</button>
-          : <button type="button" className="btn-secondary" onClick={close} disabled={discarding || nextType !== null}>Cancel</button>}
-        <button className="btn-primary" disabled={busy || discarding || nextType !== null}>{busy ? 'Uploading…' : revision ? 'Save Update' : 'Upload Draft'}</button></div>
+          : <button type="button" className="btn-secondary" onClick={close} disabled={cancelCheck === 'checking' || discarding || nextType !== null}>Cancel</button>}
+        <button type="submit" className="btn-primary" disabled={busy || discarding || nextType !== null || (cancelCheck !== null && cancelCheck !== 'clear')}>{busy ? 'Uploading…' : revision ? 'Save Update' : 'Upload Draft'}</button></div>
     </form>
   </Dialog>
 }

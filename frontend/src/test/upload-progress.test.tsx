@@ -18,7 +18,7 @@ async function prepareUpload() {
 
 it('shows byte progress, processing after transmission, and preserves inputs when cancelled', async () => {
   UploadNetwork.automatic = false
-  const saved = vi.fn(), cancelled = vi.fn()
+  const saved = vi.fn(), cancelled = vi.fn().mockResolvedValue([])
   render(<UploadRevisionModal manual={manual} onUploaded={saved} onClose={() => {}} onCancelled={cancelled} />)
   const actions = await prepareUpload()
   await actions.click(screen.getByRole('button', { name: 'Upload Draft' }))
@@ -28,12 +28,59 @@ it('shows byte progress, processing after transmission, and preserves inputs whe
   act(() => { UploadNetwork.instances[0].progress(100) })
   expect(screen.getByText(/Files sent.*waiting for the server/i)).toBeInTheDocument()
   await actions.click(screen.getByRole('button', { name: 'Cancel upload' }))
-  expect(await screen.findByRole('alert')).toHaveTextContent(/Refresh revision history before retrying/i)
+  expect(await screen.findByRole('alert')).toHaveTextContent(/history.*before retrying/i)
   expect(screen.getByLabelText('Revision Number')).toHaveValue('03')
   expect(screen.getByLabelText('Revision Detail')).toHaveValue('Safety changes')
   expect(screen.getByText('safety.pdf')).toBeInTheDocument()
   expect(saved).not.toHaveBeenCalled()
   expect(cancelled).toHaveBeenCalledOnce()
+})
+
+it('blocks retries until cancelled-upload history is checked and exposes a failed check inside the form', async () => {
+  UploadNetwork.automatic = false
+  let failHistory: (failure: Error) => void = () => {}
+  const cancelled = vi.fn().mockImplementationOnce(() => new Promise((_, reject) => { failHistory = reject }))
+    .mockResolvedValueOnce([])
+  render(<UploadRevisionModal manual={manual} onUploaded={() => {}} onClose={() => {}} onCancelled={cancelled} />)
+  const actions = await prepareUpload()
+  await actions.click(screen.getByRole('button', { name: 'Upload Draft' }))
+  await actions.click(screen.getByRole('button', { name: 'Cancel upload' }))
+  expect(screen.getByRole('button', { name: 'Upload Draft' })).toBeDisabled()
+  await act(async () => { failHistory(new Error('Network unavailable')) })
+  expect(screen.getByRole('alert')).toHaveTextContent(/Could not refresh revision history/i)
+  expect(screen.getByRole('button', { name: 'Upload Draft' })).toBeDisabled()
+  await actions.click(screen.getByRole('button', { name: 'Refresh revision history' }))
+  expect(screen.getByRole('button', { name: 'Upload Draft' })).toBeEnabled()
+  expect(screen.getByText('safety.pdf')).toBeInTheDocument()
+})
+
+it('prevents resending a cancelled upload when its revision already exists in history', async () => {
+  UploadNetwork.automatic = false
+  const cancelled = vi.fn().mockResolvedValue([{ id: 9, revision_no: '03' }])
+  render(<UploadRevisionModal manual={manual} onUploaded={() => {}} onClose={() => {}} onCancelled={cancelled} />)
+  const actions = await prepareUpload()
+  await actions.click(screen.getByRole('button', { name: 'Upload Draft' }))
+  await actions.click(screen.getByRole('button', { name: 'Cancel upload' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent(/already exists in revision history/i)
+  expect(screen.getByRole('button', { name: 'Upload Draft' })).toBeDisabled()
+  expect(screen.getByText('safety.pdf')).toBeInTheDocument()
+})
+
+it('requires reopening a cancelled BA update when the server already changed its content version', async () => {
+  UploadNetwork.automatic = false
+  const revision = { id: 9, manual_id: 7, revision_no: '03', revision_detail: 'Original detail', file_name: 'safety.pdf', file_size: 4,
+    mime_type: 'application/pdf', checksum: null, status: 'DRAFT', uploaded_by: 'dev', uploaded_at: '2026-10-07T00:00:00Z',
+    published_by: null, published_at: null, content_version: 1 }
+  const cancelled = vi.fn().mockResolvedValue([{ ...revision, content_version: 2 }])
+  render(<UploadRevisionModal manual={manual} revision={revision} onUploaded={() => {}} onClose={() => {}} onCancelled={cancelled} />)
+  const actions = userEvent.setup()
+  await actions.type(screen.getByLabelText('Revision Detail'), 'Updated wording')
+  await actions.click(screen.getByRole('button', { name: 'Save Update' }))
+  await actions.click(screen.getByRole('button', { name: 'Cancel upload' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent(/inspect the latest revision/i)
+  expect(screen.getByRole('button', { name: 'Save Update' })).toBeDisabled()
+  expect(screen.getByLabelText('Revision Detail')).toHaveValue('Original detailUpdated wording')
+  expect(UploadNetwork.instances[0].body?.get('expected_version')).toBe('1')
 })
 
 it('confirms before discarding edits and selected files on close or Escape', async () => {
@@ -80,7 +127,7 @@ it('keeps the upload form mounted while the parent refreshes history after cance
   await prepareUpload()
   await actions.click(screen.getByRole('button', { name: 'Upload Draft' }))
   await actions.click(screen.getByRole('button', { name: 'Cancel upload' }))
-  expect(await screen.findByRole('alert')).toHaveTextContent(/Refresh revision history/i)
+  expect(await screen.findByRole('alert')).toHaveTextContent(/history.*before retrying/i)
   expect(screen.getByLabelText('Revision Number')).toHaveValue('03')
   expect(screen.getByText('safety.pdf')).toBeInTheDocument()
 })

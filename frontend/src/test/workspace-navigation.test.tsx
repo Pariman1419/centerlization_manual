@@ -64,3 +64,13 @@ it('hides the queue from viewers without review permissions', async () => {
   await screen.findByRole('searchbox', { name: 'Search all documents' })
   expect(screen.queryByRole('button', { name: /Waiting for review/ })).not.toBeInTheDocument()
 })
+
+it('returns keyboard focus to the search input when results are dismissed', async () => {
+  mockWorkspace(path => path.startsWith('/api/manuals?') ? json([manual]) : undefined)
+  const actions = userEvent.setup()
+  const input = await screen.findByRole('searchbox', { name: 'Search all documents' })
+  await actions.type(input, 'Safety')
+  await actions.click(screen.getByRole('button', { name: 'Search documents' }))
+  await actions.click(await screen.findByRole('button', { name: 'Close results' }))
+  expect(input).toHaveFocus()
+})

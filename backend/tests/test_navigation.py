@@ -76,3 +76,15 @@ def test_search_is_literal_scoped_and_bounded(context, pdf):
     app.dependency_overrides[get_current_user] = admin_override
     assert len(client.get('/api/manuals', params={'search': 'Navigation', 'limit': 1}).json()) == 1
     assert client.get('/api/manuals', params={'limit': 101}).status_code == 400
+
+
+def test_review_preview_is_bounded_while_count_includes_every_pending_revision(context, pdf):
+    client, db, _, _, manuals, _ = navigation_world(context, pdf)
+    db.add_all([ManualRevision(manual_id=manuals[0]['id'], revision_no=f'{number:02d}',
+        revision_detail='', file_name='qa.pdf', object_key=f'qa/{number}.pdf', status='IN_REVIEW', uploaded_by='BA')
+        for number in range(3, 26)])
+    db.commit()
+    body = client.get('/api/manuals/review-queue').json()
+    assert body['count'] == 25
+    assert len(body['items']) == 20
+    assert len({item['revision_id'] for item in body['items']}) == 20
