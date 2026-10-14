@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { errorMessage, manualsApi } from '../api/manuals'
 import { projectsApi } from '../api/projects'
@@ -31,6 +31,7 @@ export function ManualDetailPage({ currentUsername }: { currentUsername?: string
   const [devReviewDialog, setDevReviewDialog] = useState<{ revision: Revision; mode: 'request' | 'feedback' } | null>(null)
   const [reload, setReload] = useState(0)
   const [role, setRole] = useState<EffectiveRole>(null)
+  const viewGeneration = useRef(0)
 
   // Publish Dialog State
   const [selectedPublish, setSelectedPublish] = useState<Revision | null>(null)
@@ -76,6 +77,7 @@ export function ManualDetailPage({ currentUsername }: { currentUsername?: string
 
   useEffect(() => {
     let active = true
+    viewGeneration.current++
     setLoading(true)
     setError('')
     if (!Number.isSafeInteger(manualId) || manualId <= 0) {
@@ -115,8 +117,19 @@ export function ManualDetailPage({ currentUsername }: { currentUsername?: string
 
     return () => {
       active = false
+      viewGeneration.current++
     }
   }, [manualId, reload])
+
+  async function refreshCancelledUpload() {
+    const generation = viewGeneration.current
+    try {
+      const history = await manualsApi.revisions(manualId)
+      if (generation === viewGeneration.current) setRevisions(history)
+    } catch {
+      if (generation === viewGeneration.current) setMessage('Revision history could not be refreshed. Check your connection and refresh before retrying.')
+    }
+  }
 
   async function handleSaveRevision() {
     if (!editRevision || savingEdit) return
@@ -412,6 +425,7 @@ export function ManualDetailPage({ currentUsername }: { currentUsername?: string
             <UploadRevisionModal
               manual={manual}
               onClose={() => setUploading(false)}
+              onCancelled={refreshCancelledUpload}
               onUploaded={revision => {
                 setUploading(false)
                 setMessage(`Revision ${revision.revision_no} uploaded successfully.`)
@@ -422,6 +436,7 @@ export function ManualDetailPage({ currentUsername }: { currentUsername?: string
 
           {updatingRevision && <UploadRevisionModal manual={manual} revision={updatingRevision}
             onClose={() => setUpdatingRevision(null)}
+            onCancelled={refreshCancelledUpload}
             onUploaded={revision => {
               setUpdatingRevision(null)
               setMessage(`REV ${revision.revision_no} updated. Approve the draft or request Dev review.`)

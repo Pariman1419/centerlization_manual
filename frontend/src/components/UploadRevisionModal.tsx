@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { errorMessage, manualsApi } from '../api/manuals'
 import type { Manual, Revision } from '../types/manual'
 import { Dialog } from './Dialog'
@@ -28,8 +28,8 @@ function FileRow({ file, onRemove }: { file: File; onRemove: () => void }) {
   </div>
 }
 
-export function UploadRevisionModal({ manual, revision, onUploaded, onClose }: {
-  manual: Manual; revision?: Revision; onUploaded: (revision: Revision) => void; onClose: () => void
+export function UploadRevisionModal({ manual, revision, onUploaded, onClose, onCancelled }: {
+  manual: Manual; revision?: Revision; onUploaded: (revision: Revision) => void; onClose: () => void; onCancelled?: () => void
 }) {
   const [type, setType] = useState<FileType>('PDF')
   const [files, setFiles] = useState<File[]>([])
@@ -37,8 +37,33 @@ export function UploadRevisionModal({ manual, revision, onUploaded, onClose }: {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [dragging, setDragging] = useState(false)
+  const [revisionNumber, setRevisionNumber] = useState('')
+  const [detail, setDetail] = useState(revision?.revision_detail ?? '')
+  const [progress, setProgress] = useState<number | null>(0)
+  const [discarding, setDiscarding] = useState(false)
+  const [nextType, setNextType] = useState<FileType | null>(null)
+  const controller = useRef<AbortController | null>(null)
+  const mounted = useRef(true)
+  const dirty = files.length > 0 || revisionNumber.length > 0 || detail !== (revision?.revision_detail ?? '') || otherType.length > 0
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false; controller.current?.abort() }
+  }, [])
+  useEffect(() => {
+    if (!dirty && !busy) return
+    function warn(event: BeforeUnloadEvent) { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty, busy])
 
-  function changeType(next: FileType) { setType(next); setFiles([]); setError('') }
+  function close() { if (busy) return; if (dirty) setDiscarding(true); else onClose() }
+  function applyType(next: FileType) { setType(next); setFiles([]); setError(''); setNextType(null) }
+  function changeType(next: FileType) {
+    if (next === type) return
+    if (files.length) setNextType(next)
+    else applyType(next)
+  }
+
   function validate(file: File): string {
     if (file.size === 0) return `${file.name} is empty. Select another file.`
     if (file.size > MAX_BYTES) return `${file.name} must be at most 50 MB.`
@@ -65,7 +90,7 @@ export function UploadRevisionModal({ manual, revision, onUploaded, onClose }: {
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (busy) return
+    if (busy || discarding || nextType) return
     if (!revision && files.length === 0) { setError('Select a file to upload.'); return }
     const form = new FormData(event.currentTarget)
     const data = new FormData()
@@ -81,14 +106,27 @@ export function UploadRevisionModal({ manual, revision, onUploaded, onClose }: {
         files.forEach(file => data.append('other_files', file))
       }
     }
-    setBusy(true); setError('')
-    try { onUploaded(await (revision ? manualsApi.replaceFiles(revision.id, data) : manualsApi.upload(manual.id, data))) }
-    catch (err) { setError(errorMessage(err)) }
-    finally { setBusy(false) }
+    const request = new AbortController()
+    controller.current = request
+    setBusy(true); setError(''); setProgress(0)
+    const options = { signal: request.signal, onProgress: (percent: number | null) => { if (mounted.current) setProgress(percent) } }
+    try {
+      const saved = await (revision ? manualsApi.replaceFiles(revision.id, data, options) : manualsApi.upload(manual.id, data, options))
+      if (mounted.current && !request.signal.aborted) onUploaded(saved)
+    } catch (err) {
+      if (!mounted.current) return
+      if (request.signal.aborted) {
+        setError('Upload cancelled on this device. The server may already have saved the revision. Refresh revision history before retrying.')
+        onCancelled?.()
+      } else setError(errorMessage(err))
+    } finally {
+      controller.current = null
+      if (mounted.current) setBusy(false)
+    }
   }
-  return <Dialog title={revision ? `Update REV ${revision.revision_no}` : "Upload New Revision"} onClose={onClose} busy={busy}>
+  return <Dialog title={revision ? `Update REV ${revision.revision_no}` : "Upload New Revision"} onClose={close} busy={busy}>
     <form onSubmit={submit}>
-      <fieldset disabled={busy} className="space-y-5 px-6 py-5">
+      <fieldset disabled={busy || discarding || nextType !== null} className="space-y-5 px-6 py-5">
         <div className="rounded-md bg-slate-50 p-3 text-sm">
           <p className="mb-2 text-slate-500">Project: {manual.project_name}</p>
           <p className="font-medium text-slate-800">{manual.title}</p>
@@ -98,8 +136,8 @@ export function UploadRevisionModal({ manual, revision, onUploaded, onClose }: {
           <p className="font-semibold">Revision Number: {revision.revision_no} (unchanged)</p>
           <p>Selected files replace the same file type. Other file types are kept. Previous approvals and Dev feedback do not apply to this update.</p>
           <RevisionFiles revision={revision} />
-        </div> : <label className="field">Revision Number<input name="revision_no" required maxLength={50} placeholder="04" autoFocus pattern="[A-Za-z0-9][A-Za-z0-9_.-]*" /></label>}
-        <label className="field">Revision Detail<textarea name="revision_detail" defaultValue={revision?.revision_detail ?? ''} rows={4} maxLength={20000} placeholder="Describe what changed in this revision." /></label>
+        </div> : <label className="field">Revision Number<input name="revision_no" value={revisionNumber} onChange={event => setRevisionNumber(event.target.value)} required maxLength={50} placeholder="04" autoFocus pattern="[A-Za-z0-9][A-Za-z0-9_.-]*" /></label>}
+        <label className="field">Revision Detail<textarea name="revision_detail" value={detail} onChange={event => setDetail(event.target.value)} rows={4} maxLength={20000} placeholder="Describe what changed in this revision." /></label>
         <label className="field">Type
           <select value={type} onChange={event => changeType(event.target.value as FileType)}>
             <option value="PDF">PDF</option>
@@ -128,8 +166,24 @@ export function UploadRevisionModal({ manual, revision, onUploaded, onClose }: {
         <p className="text-xs text-slate-500">Updates and uploads are saved as drafts. BA approves the latest files before publishing.</p>
         {error && <p role="alert" className="error">{error}</p>}
       </fieldset>
-      <div className="modal-footer"><button type="button" className="btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
-        <button className="btn-primary" disabled={busy}>{busy ? 'Uploading…' : revision ? 'Save Update' : 'Upload Draft'}</button></div>
+      {busy && <div className="px-6 pb-5" aria-live="polite">
+        <progress aria-label="File upload" max={100} value={progress ?? undefined} className="upload-progress" />
+        <p className="mt-2 text-sm text-slate-600">{progress === 100 ? 'Files sent; waiting for the server to save the revision…' : progress === null ? 'Sending files…' : `Sending files: ${progress}%`}</p>
+      </div>}
+      {discarding && <section role="alertdialog" aria-label="Discard unsaved changes" className="upload-confirmation">
+        <p className="font-semibold">Discard unsaved changes?</p><p>Revision details and selected files will be cleared.</p>
+        <div><button type="button" className="btn-secondary" autoFocus onClick={() => setDiscarding(false)}>Keep editing</button>
+          <button type="button" className="btn-danger" onClick={onClose}>Discard changes</button></div>
+      </section>}
+      {nextType && <section role="alertdialog" aria-label="Change file type" className="upload-confirmation">
+        <p className="font-semibold">Changing the file type clears the selected files.</p>
+        <div><button type="button" className="btn-secondary" autoFocus onClick={() => setNextType(null)}>Keep files</button>
+          <button type="button" className="btn-danger" onClick={() => applyType(nextType)}>Change type and clear files</button></div>
+      </section>}
+      <div className="modal-footer">
+        {busy ? <button type="button" className="btn-secondary" onClick={() => controller.current?.abort()}>Cancel upload</button>
+          : <button type="button" className="btn-secondary" onClick={close} disabled={discarding || nextType !== null}>Cancel</button>}
+        <button className="btn-primary" disabled={busy || discarding || nextType !== null}>{busy ? 'Uploading…' : revision ? 'Save Update' : 'Upload Draft'}</button></div>
     </form>
   </Dialog>
 }

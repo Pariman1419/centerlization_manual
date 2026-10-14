@@ -40,13 +40,74 @@ async function fetchRequest<T>(path: string, options: RequestInit): Promise<T> {
     throw new Error('Unable to reach Manual Management. Check your connection and try again.')
   }
   const body = await response.json().catch(() => null)
-  if (response.status === 401 && path !== '/auth/login' && generation === requestGeneration) {
+  return responseBody<T>(path, response.status, body, generation)
+}
+
+function responseBody<T>(path: string, status: number, body: unknown, generation: number): T {
+  if (status === 401 && path !== '/auth/login' && generation === requestGeneration) {
     setCsrfToken('')
     window.dispatchEvent(new Event('manual-auth-required'))
   }
-  if (!response.ok) throw new Error(typeof body?.detail === 'string' ? body.detail : 'Unable to complete the request. Please try again.')
+  if (status < 200 || status >= 300) {
+    const detail = body && typeof body === 'object' && 'detail' in body ? body.detail : null
+    throw new Error(typeof detail === 'string' ? detail : 'Unable to complete the request. Please try again.')
+  }
   if (body === null) throw new Error('The server returned an unexpected response. Please try again.')
   return body as T
+}
+
+export interface UploadOptions {
+  signal?: AbortSignal
+  onProgress?: (percent: number | null) => void
+}
+
+function uploadRequest<T>(path: string, body: FormData, options: UploadOptions): Promise<T> {
+  clearReadCache()
+  const generation = requestGeneration
+  const pending = new Promise<T>((resolve, reject) => {
+    if (options.signal?.aborted) { reject(new DOMException('Upload cancelled', 'AbortError')); return }
+    const xhr = new XMLHttpRequest()
+    let settled = false
+    function cleanup() {
+      options.signal?.removeEventListener('abort', cancel)
+      xhr.upload.removeEventListener('progress', progress)
+      xhr.removeEventListener('load', load)
+      xhr.removeEventListener('error', error)
+      xhr.removeEventListener('abort', aborted)
+      xhr.removeEventListener('timeout', timeout)
+    }
+    function fail(failure: unknown) {
+      if (settled) return
+      settled = true; cleanup(); reject(failure)
+    }
+    function progress(event: ProgressEvent) {
+      options.onProgress?.(event.lengthComputable && event.total > 0 ? Math.min(100, Math.round(event.loaded / event.total * 100)) : null)
+    }
+    function cancel() { xhr.abort() }
+    function aborted() { fail(new DOMException('Upload cancelled', 'AbortError')) }
+    function error() { fail(new Error('Unable to reach Manual Management. Check your connection and try again. Refresh revision history before retrying an upload.')) }
+    function timeout() { fail(new Error('Upload timed out. Refresh revision history before retrying.')) }
+    function load() {
+      if (settled) return
+      let payload: unknown = null
+      try { payload = JSON.parse(xhr.responseText) } catch { /* Gateways may return HTML. */ }
+      try {
+        const result = responseBody<T>(path, xhr.status, payload, generation)
+        settled = true; cleanup(); resolve(result)
+      } catch (failure) { fail(failure) }
+    }
+    xhr.open('POST', `/api${path}`)
+    xhr.withCredentials = true
+    if (csrfToken) xhr.setRequestHeader('X-CSRF-Token', csrfToken)
+    xhr.upload.addEventListener('progress', progress)
+    xhr.addEventListener('load', load)
+    xhr.addEventListener('error', error)
+    xhr.addEventListener('abort', aborted)
+    xhr.addEventListener('timeout', timeout)
+    options.signal?.addEventListener('abort', cancel, { once: true })
+    try { xhr.send(body) } catch (failure) { fail(failure) }
+  })
+  return pending.finally(finishMutation)
 }
 
 export const manualsApi = {
@@ -58,7 +119,9 @@ export const manualsApi = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
   }),
   revisions: (id: number) => request<Revision[]>(`/manuals/${id}/revisions`),
-  upload: (id: number, body: FormData) => request<Revision>(`/manuals/${id}/revisions`, { method: 'POST', body }),
+  upload: (id: number, body: FormData, options?: UploadOptions) => options
+    ? uploadRequest<Revision>(`/manuals/${id}/revisions`, body, options)
+    : request<Revision>(`/manuals/${id}/revisions`, { method: 'POST', body }),
   publish: (id: number) => request<Revision>(`/revisions/${id}/publish`, { method: 'POST' }),
   submitReview: (id: number) => request<Revision>(`/revisions/${id}/submit-review`, { method: 'POST' }),
   approve: (id: number, comment?: string, expected_version = 0) => request<Revision>(`/revisions/${id}/approve`, {
@@ -73,7 +136,9 @@ export const manualsApi = {
   updateRevision: (id: number, revision_detail: string) => request<Revision>(`/revisions/${id}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision_detail }),
   }),
-  replaceFiles: (id: number, body: FormData) => request<Revision>(`/revisions/${id}/update-files`, { method: 'POST', body }),
+  replaceFiles: (id: number, body: FormData, options?: UploadOptions) => options
+    ? uploadRequest<Revision>(`/revisions/${id}/update-files`, body, options)
+    : request<Revision>(`/revisions/${id}/update-files`, { method: 'POST', body }),
   requestDevReview: (id: number, expected_version: number) => request<Revision>(`/revisions/${id}/request-dev-review`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expected_version }),
   }),
